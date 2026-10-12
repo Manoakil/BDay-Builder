@@ -236,7 +236,7 @@ const videoWishes = wishes.filter(w => w.wish_type === 'video');
             ) : (
               <ScrollReveal>
                 <section style={{ padding: '100px 20px', textAlign: 'center', color: 'var(--bb-text-muted)' }}>
-                  <p>Your memory lane is waiting for its first chapter.</p>
+                  <p>Your Memory Line is waiting for its first chapter.</p>
                 </section>
               </ScrollReveal>
             )

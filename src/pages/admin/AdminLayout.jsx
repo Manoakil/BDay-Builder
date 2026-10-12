@@ -25,7 +25,7 @@ export default function AdminLayout({ children, role = 'admin' }) {
     { name: 'Users & Invites', path: '/admin/users' },
     { name: 'Wishes', path: '/admin/wishes' },
     { name: 'Memories', path: '/admin/memories' },
-    { name: 'Timeline', path: '/admin/timeline' },
+    { name: 'Memory Line', path: '/admin/timeline' },
     { name: 'Secret Vault', path: '/admin/vault' },
     { name: 'Wish Book', path: '/admin/wish-book' },
     { name: 'Guest Portal (Wish)', path: '/wisher' },

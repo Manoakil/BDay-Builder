@@ -1399,7 +1399,7 @@ function WishersHome() {
           className={`wh-tab ${activeTab === "timeline" ? "active" : ""}`}
         >
           <HiOutlineClock />
-          Timeline
+          Memory Line
         </button>
 
         <button
@@ -1428,15 +1428,18 @@ function WishersHome() {
 
       <div className="wh-content">
         {/* ==================================================== */}
-        {/* TIMELINE */}
+        {/* MEMORY LINE */}
         {/* ==================================================== */}
 
         {activeTab === "timeline" && (
           <div className="wh-col">
             <h2 className="wh-col-title">
               <HiOutlineClock />
-              Memory Timeline
+              Memory Line
             </h2>
+            <p style={{ margin: "-8px 0 16px", color: "rgba(255, 255, 255, 0.7)", fontSize: "0.88rem" }}>
+              Contribute cherished moments, photos, and milestones to the live Memory Line.
+            </p>
 
             <div className="wh-section">
               <input

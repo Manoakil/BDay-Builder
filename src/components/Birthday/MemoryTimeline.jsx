@@ -108,8 +108,25 @@ export default function MemoryTimeline({ timelineEntries = [], wisherName }) {
   return (
     <section className="bb-timeline-section" id="memories">
       <div className="bb-timeline-header">
-        <h2 className="bb-h2 bb-timeline-heading">Your story, so far.</h2>
-        <p className="bb-timeline-subheading">A few moments worth remembering.</p>
+        <span className="bb-timeline-kicker" style={{
+          display: "inline-block",
+          textTransform: "uppercase",
+          letterSpacing: "0.2em",
+          fontSize: "0.78rem",
+          fontWeight: 700,
+          color: "var(--bb-accent, #e63946)",
+          marginBottom: "12px",
+          background: "rgba(230, 57, 70, 0.08)",
+          padding: "5px 16px",
+          borderRadius: "20px",
+          border: "1px solid rgba(230, 57, 70, 0.2)"
+        }}>
+          ✦ Memory Line ✦
+        </span>
+        <h2 className="bb-h2 bb-timeline-heading">Memory Line</h2>
+        <p className="bb-timeline-subheading" style={{ maxWidth: "620px", margin: "0 auto", fontSize: "15px", lineHeight: "1.7", color: "#6b5e68" }}>
+          A walk through cherished moments, milestones, and memories leading up to your special day — captured and preserved with love.
+        </p>
       </div>
 
       <div className="bb-carousel-wrapper">

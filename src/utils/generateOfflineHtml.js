@@ -247,7 +247,8 @@ export const generateOfflineHtml = (birthdayName, wishes = [], videoWishes = [],
     ` : ''}
 
     ${sortedTimeline.length > 0 ? `
-      <h2 class="section-title">Memory Lane</h2>
+      <h2 class="section-title">Memory Line</h2>
+      <p style="text-align: center; color: #777; margin: -10px auto 25px; max-width: 600px; font-size: 0.95rem;">A walk through cherished moments, milestones, and memories leading up to your special day.</p>
       <div class="timeline">
         ${sortedTimeline.map(entry => `
           <div class="timeline-item">

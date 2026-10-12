@@ -45,7 +45,7 @@ export default function BirthdayNavbar({ birthdayName, hasVault, enableWishes=tr
         
         <div className="bb-navbar-links">
           <button onClick={() => scrollTo('memories')} className="bb-navbar-link hide-mobile">
-            Memories
+            Memory Line
           </button>
           <button onClick={() => scrollTo('wishes')} className="bb-navbar-link hide-mobile">
             Wishes

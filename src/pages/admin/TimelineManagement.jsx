@@ -51,11 +51,11 @@ function TimelineManagement() {
 
   return (
     <div className="admin-section">
-      <h2 className="admin-section-title">⏱️ Life Timeline Management</h2>
-      <p className="admin-section-subtitle">Curate the chronological journey. Review all timeline entries contributed by wishers.</p>
+      <h2 className="admin-section-title">⏱️ Memory Line Management</h2>
+      <p className="admin-section-subtitle">Curate the chronological journey. Review all Memory Line entries contributed by wishers.</p>
 
       {timeline.length === 0 ? (
-        <div className="admin-empty">No timeline entries have been added yet.</div>
+        <div className="admin-empty">No Memory Line entries have been added yet.</div>
       ) : (
         <div className="admin-table-container">
           <table className="admin-table">

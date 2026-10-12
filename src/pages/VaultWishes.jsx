@@ -560,13 +560,16 @@ function VaultWishes({ isOffline, offlineVaultData, offlineEventData, onBack }) 
 
                 <div>
                   <span className="bb-section-kicker" style={{ fontWeight: "bold" }}>
-                    OUR LITTLE ARCHIVE
+                    ✦ MEMORY LINE ✦
                   </span>
 
                   <h2>
-                    Moments I
-                    <em>keep.</em>
+                    Memory
+                    <em>Line.</em>
                   </h2>
+                  <p style={{ margin: "8px 0 0", color: "#666", fontSize: "0.95rem", maxWidth: "560px", lineHeight: "1.6" }}>
+                    A journey through special moments and memories kept close to heart.
+                  </p>
                 </div>
 
                 <div className="bb-timeline-controls">
