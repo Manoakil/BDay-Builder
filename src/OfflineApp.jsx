@@ -14,7 +14,7 @@ import BirthdayReveal from './components/Birthday/BirthdayReveal';
 import VaultWishes from './pages/VaultWishes';
 
 export default function OfflineApp({ data }) {
-  const [step, setStep] = useState('welcome');
+  const [step, setStep] = useState(data?.start_step || 'welcome');
 
   React.useEffect(() => {
     document.title = "Wish Land";

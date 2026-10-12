@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import "../style/VaultWishes.css";
 import { getBirthdayVault, attemptBirthdayVault } from "../service/wishService";
-import { API_BASE_URL } from "../service/authService";
+import { API_BASE_URL, getAuthHeaders } from "../service/authService";
 import { generateVaultWishHtml } from "../utils/generateOfflineHtml";
 
 import ScrollReveal from "../components/Birthday/ScrollReveal";
@@ -121,16 +121,19 @@ function VaultWishes({ isOffline, offlineVaultData, offlineEventData, onBack }) 
 
         let bestName = loadedEvent?.birthday_person_name || "Birthday Star";
         let bestSlug = loadedEvent?.slug || "";
+        let bestId = loadedEvent?.id || loadedVault?.event_id || eventIdParam;
 
         if (evRes) {
           if (evRes.birthday_person_name) bestName = evRes.birthday_person_name;
           if (evRes.slug) bestSlug = evRes.slug;
+          if (evRes.id) bestId = evRes.id;
         } else if (wisherRes && wisherRes.event) {
           if (wisherRes.event.birthday_person_name) bestName = wisherRes.event.birthday_person_name;
           if (wisherRes.event.slug) bestSlug = wisherRes.event.slug;
+          if (wisherRes.event.id) bestId = wisherRes.event.id;
         }
 
-        setEventData({ birthday_person_name: bestName, slug: bestSlug });
+        setEventData({ id: bestId, birthday_person_name: bestName, slug: bestSlug });
       } catch (e) {
         console.error(e);
       } finally {
@@ -276,6 +279,38 @@ function VaultWishes({ isOffline, offlineVaultData, offlineEventData, onBack }) 
     submitAnswer("time");
   };
 
+  const handleDownloadVaultKeepsake = async () => {
+    const targetEventId = eventData?.id || vaultData?.event_id || eventId;
+    if (!targetEventId || isOffline) {
+      generateVaultWishHtml(HER_NAME, vaultData, YOUR_NAME);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/offline-celebration/${targetEventId}/vault-package`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error("Server vault package failed, fallback to html");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `secret-vault-${eventData?.slug || targetEventId}.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      console.warn("Falling back to standalone single-file vault html:", err);
+      generateVaultWishHtml(HER_NAME, vaultData, YOUR_NAME);
+    }
+  };
+
 
   // If Vault is Locked, present the Secret Question Challenge Screen
   if (!isUnlocked) {
@@ -360,7 +395,7 @@ function VaultWishes({ isOffline, offlineVaultData, offlineEventData, onBack }) 
       {/* Floating Download Keepsake Button */}
       <div className="bb-vault-topbar">
         <button
-          onClick={() => generateVaultWishHtml(HER_NAME, vaultData, YOUR_NAME)}
+          onClick={handleDownloadVaultKeepsake}
           className="bb-vault-download-btn"
           title="Download Vault Wish Keepsake"
         >
@@ -1050,7 +1085,7 @@ function VaultWishes({ isOffline, offlineVaultData, offlineEventData, onBack }) 
 
             <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap", marginTop: "10px" }}>
               <button
-                onClick={() => generateVaultWishHtml(HER_NAME, vaultData, YOUR_NAME)}
+                onClick={handleDownloadVaultKeepsake}
                 style={{
                   background: "linear-gradient(135deg, #ffd166 0%, #e6a836 100%)",
                   border: "none",
