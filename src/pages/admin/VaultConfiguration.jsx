@@ -140,35 +140,66 @@ function VaultConfiguration() {
           </label>
         </div>
 
-        {isEnabled && (
+        {vault?.id && event?.organization_id && (
           <div style={{
-            background: "rgba(255, 209, 102, 0.08)",
-            border: "1px solid rgba(255, 209, 102, 0.3)",
+            background: isEnabled ? "rgba(255, 209, 102, 0.08)" : "rgba(255, 255, 255, 0.04)",
+            border: isEnabled ? "1px solid rgba(255, 209, 102, 0.35)" : "1px solid rgba(255, 255, 255, 0.15)",
             borderRadius: "12px",
-            padding: "16px 20px",
+            padding: "18px 20px",
             marginBottom: "2rem"
           }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "8px" }}>
-              <span style={{ fontWeight: 600, color: "#ffd166", fontSize: "0.95rem" }}>
-                🔗 Dedicated Secret Vault Wish Link
-              </span>
-              <button
-                type="button"
-                className="admin-btn outline"
-                style={{ padding: "6px 14px", fontSize: "0.85rem" }}
-                onClick={() => {
-                  const shareUrl = `${window.location.origin}/vault?org_id=${event.organization_id}&vault_id=${vault.id}`;
-                  navigator.clipboard.writeText(shareUrl);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2500);
-                  dialog.showAlert("Secret Vault link copied to clipboard!");
-                }}
-              >
-                {copied ? "✓ Copied!" : "📋 Copy Link"}
-              </button>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexWrap: "wrap", gap: "10px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ fontWeight: 700, color: "#ffd166", fontSize: "1rem" }}>
+                  🔗 Dedicated Secret Vault Wish Link
+                </span>
+                <span style={{
+                  fontSize: "0.75rem",
+                  padding: "2px 8px",
+                  borderRadius: "10px",
+                  fontWeight: 600,
+                  background: isEnabled ? "rgba(46, 204, 113, 0.2)" : "rgba(231, 76, 60, 0.2)",
+                  color: isEnabled ? "#2ecc71" : "#e74c3c",
+                  border: isEnabled ? "1px solid rgba(46, 204, 113, 0.4)" : "1px solid rgba(231, 76, 60, 0.4)"
+                }}>
+                  {isEnabled ? "Active & Unlockable" : "Vault Disabled"}
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  type="button"
+                  className="admin-btn outline"
+                  style={{ padding: "6px 14px", fontSize: "0.85rem" }}
+                  onClick={() => {
+                    const shareUrl = `${window.location.origin}/vault?org_id=${event.organization_id}&vault_id=${vault.id}`;
+                    navigator.clipboard.writeText(shareUrl);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2500);
+                    dialog.showAlert("Secret Vault link copied to clipboard!");
+                  }}
+                >
+                  {copied ? "✓ Copied!" : "📋 Copy Link"}
+                </button>
+                <button
+                  type="button"
+                  className="admin-btn primary"
+                  style={{ padding: "6px 14px", fontSize: "0.85rem" }}
+                  onClick={() => {
+                    const shareUrl = `${window.location.origin}/vault?org_id=${event.organization_id}&vault_id=${vault.id}`;
+                    window.open(shareUrl, "_blank");
+                  }}
+                >
+                  🔗 Open / Test Link
+                </button>
+              </div>
             </div>
-            <p style={{ margin: "0 0 8px", fontSize: "0.85rem", color: "#e2e8f0" }}>
-              Share this dedicated link with the birthday star. They will be asked the secret question before unlocking the vault!
+            <p style={{ margin: "0 0 10px", fontSize: "0.85rem", color: "#e2e8f0" }}>
+              Share this dedicated link with the birthday star. When visited, they will be prompted with the challenge question before unlocking the vault wishes!
+              {!isEnabled && (
+                <strong style={{ display: "block", marginTop: "4px", color: "#f39c12" }}>
+                  ⚠️ Note: Enable the Secret Vault toggle above and click "Save Vault Configuration" to activate this link for visitors.
+                </strong>
+              )}
             </p>
             <input
               type="text"
@@ -176,12 +207,12 @@ function VaultConfiguration() {
               value={`${window.location.origin}/vault?org_id=${event.organization_id}&vault_id=${vault.id}`}
               style={{
                 width: "100%",
-                background: "rgba(0,0,0,0.3)",
-                border: "1px solid rgba(255,255,255,0.15)",
+                background: "rgba(0,0,0,0.35)",
+                border: "1px solid rgba(255,209,102,0.3)",
                 color: "#ffd166",
-                padding: "8px 12px",
-                borderRadius: "6px",
-                fontSize: "0.85rem",
+                padding: "10px 14px",
+                borderRadius: "8px",
+                fontSize: "0.9rem",
                 fontFamily: "monospace"
               }}
               onClick={(e) => e.target.select()}
