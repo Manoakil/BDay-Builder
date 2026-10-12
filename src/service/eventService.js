@@ -11,7 +11,14 @@ export const createEvent = async (eventData) => {
   const res = await fetch(`${API_BASE_URL}/events/`, {
     method: "POST", headers: getAuthHeaders(true), body: JSON.stringify(eventData)
   });
-  if (!res.ok) throw new Error("Failed to create event");
+  if (!res.ok) {
+    let errMsg = "Failed to create event";
+    try {
+      const errData = await res.json();
+      errMsg = errData.detail || errData.message || errMsg;
+    } catch (_) {}
+    throw new Error(errMsg);
+  }
   return res.json();
 };
 
@@ -19,7 +26,14 @@ export const updateEvent = async (eventId, eventData) => {
   const res = await fetch(`${API_BASE_URL}/events/${eventId}`, {
     method: "PUT", headers: getAuthHeaders(true), body: JSON.stringify(eventData)
   });
-  if (!res.ok) throw new Error("Failed to update event");
+  if (!res.ok) {
+    let errMsg = "Failed to update event";
+    try {
+      const errData = await res.json();
+      errMsg = errData.detail || errData.message || errMsg;
+    } catch (_) {}
+    throw new Error(errMsg);
+  }
   return res.json();
 };
 
@@ -35,7 +49,14 @@ export const updateVault = async (vaultId, vaultData) => {
   const res = await fetch(`${API_BASE_URL}/vault/${vaultId}`, {
     method: "PATCH", headers: getAuthHeaders(true), body: JSON.stringify(vaultData)
   });
-  if (!res.ok) throw new Error("Failed to update vault");
+  if (!res.ok) {
+    let errMsg = "Failed to update vault";
+    try {
+      const errData = await res.json();
+      errMsg = errData.detail || errData.message || errMsg;
+    } catch (_) {}
+    throw new Error(errMsg);
+  }
   return res.json();
 };
 
@@ -121,6 +142,13 @@ export const createVault = async (vaultData) => {
   const res = await fetch(`${API_BASE_URL}/vault/`, {
     method: "POST", headers: getAuthHeaders(true), body: JSON.stringify(vaultData)
   });
-  if (!res.ok) throw new Error("Failed to create vault");
+  if (!res.ok) {
+    let errMsg = "Failed to create vault";
+    try {
+      const errData = await res.json();
+      errMsg = errData.detail || errData.message || errMsg;
+    } catch (_) {}
+    throw new Error(errMsg);
+  }
   return res.json();
 };

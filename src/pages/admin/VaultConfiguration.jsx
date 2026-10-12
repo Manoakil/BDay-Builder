@@ -39,7 +39,7 @@ function VaultConfiguration() {
         if (vaultData) {
           setVault(vaultData);
           setIsEnabled(vaultData.is_enabled);
-          setChallengeQuestion(vaultData.challenge_question || '');
+          setChallengeQuestion(vaultData.question || vaultData.challenge_question || '');
           setHint(vaultData.hint || '');
           if (vaultData.locked_until) {
             const date = new Date(vaultData.locked_until);
