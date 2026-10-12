@@ -23,9 +23,9 @@ export function DialogProvider({ children }) {
     });
   };
 
-  const showConfirm = (message) => {
+  const showConfirm = (message, confirmText = "Yes", cancelText = "No", isDanger = false) => {
     return new Promise((resolve) => {
-      setDialogState({ isOpen: true, message, type: 'confirm', resolve });
+      setDialogState({ isOpen: true, message, type: 'confirm', confirmText, cancelText, isDanger, resolve });
     });
   };
 
@@ -82,8 +82,15 @@ export function DialogProvider({ children }) {
               
               {dialogState.type === 'confirm' && (
                 <>
-                  <button className="dialog-btn secondary" onClick={() => handleClose(false)}>Cancel</button>
-                  <button className="dialog-btn primary danger" onClick={() => handleClose(true)}>Confirm</button>
+                  <button className="dialog-btn secondary" onClick={() => handleClose(false)}>
+                    {dialogState.cancelText || 'No'}
+                  </button>
+                  <button 
+                    className={`dialog-btn primary ${dialogState.isDanger ? 'danger' : ''}`} 
+                    onClick={() => handleClose(true)}
+                  >
+                    {dialogState.confirmText || 'Yes'}
+                  </button>
                 </>
               )}
 

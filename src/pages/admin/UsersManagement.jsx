@@ -14,7 +14,7 @@ export default function UsersManagement() {
   const fetchMembers = async (id) => {
     try {
       const data = await getOrganizationMembers(id);
-      setMembers(data);
+      setMembers(data || []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -41,37 +41,81 @@ export default function UsersManagement() {
     init();
   }, []);
 
-  const handleApprove = async (userId) => {
+  const handleApprove = async (userId, memberName) => {
+    const confirmed = await dialog.showConfirm(
+      `Are you sure you want to approve ${memberName || 'this user'}?`,
+      "Yes",
+      "No",
+      false
+    );
+    if (!confirmed) return;
+
     try {
+      // Optimistic update so the UI immediately updates to show "approved"
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.user_id === userId
+            ? { ...m, approval_status: 'approved', status: 'active' }
+            : m
+        )
+      );
+
       await approveMember(orgId, userId);
-      fetchMembers(orgId);
+      await fetchMembers(orgId);
+      dialog.showAlert(`${memberName || 'User'} has been approved successfully!`);
     } catch (err) {
-      dialog.showAlert(err.message);
+      await fetchMembers(orgId);
+      dialog.showAlert(err.message || "Failed to approve member");
     }
   };
 
-  const handleReject = async (userId) => {
-    const reason = await dialog.showPrompt("Enter reason for rejection:");
+  const handleReject = async (userId, memberName) => {
+    const reason = await dialog.showPrompt(`Enter reason for rejecting ${memberName || 'this user'}:`);
     if (reason === null) return;
     try {
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.user_id === userId
+            ? { ...m, approval_status: 'rejected', status: 'suspended', rejection_reason: reason }
+            : m
+        )
+      );
       await rejectMember(orgId, userId, reason);
-      fetchMembers(orgId);
+      await fetchMembers(orgId);
+      dialog.showAlert("Member has been rejected.");
     } catch (err) {
-      dialog.showAlert(err.message);
+      await fetchMembers(orgId);
+      dialog.showAlert(err.message || "Failed to reject member");
     }
   };
 
   const handleRemove = async (memberId) => {
-    const confirmed = await dialog.showConfirm("Are you sure you want to remove this member?");
+    const confirmed = await dialog.showConfirm(
+      "Are you sure you want to remove this member?",
+      "Yes",
+      "No",
+      true
+    );
     if (!confirmed) return;
     try {
       await removeMember(orgId, memberId);
-      fetchMembers(orgId);
+      await fetchMembers(orgId);
       dialog.showAlert("Member removed successfully.");
     } catch (err) {
-      dialog.showAlert(err.message);
+      dialog.showAlert(err.message || "Failed to remove member");
     }
   };
+
+  // Sort so unapproved/pending members are displayed on top
+  const sortedMembers = [...members].sort((a, b) => {
+    const aStatus = (a.approval_status || 'pending').toLowerCase();
+    const bStatus = (b.approval_status || 'pending').toLowerCase();
+    const aPending = aStatus === 'pending' || aStatus === 'unapproved';
+    const bPending = bStatus === 'pending' || bStatus === 'unapproved';
+    if (aPending && !bPending) return -1;
+    if (!aPending && bPending) return 1;
+    return new Date(b.created_at || b.joined_at || 0) - new Date(a.created_at || a.joined_at || 0);
+  });
 
   return (
     <div className="admin-section">
@@ -83,7 +127,7 @@ export default function UsersManagement() {
           <div className="admin-loading">Loading members...</div>
         ) : error ? (
           <div className="admin-empty" style={{ color: "var(--admin-danger)" }}>{error}</div>
-        ) : members.length === 0 ? (
+        ) : sortedMembers.length === 0 ? (
           <div className="admin-empty">No members found.</div>
         ) : (
           <table className="admin-table">
@@ -97,39 +141,67 @@ export default function UsersManagement() {
               </tr>
             </thead>
             <tbody>
-              {members.map((member) => (
-                <tr key={member.id}>
-                  <td data-label="Name">
-                    <div className="font-medium" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <HiOutlineUserGroup style={{ color: 'var(--admin-primary)' }} />
-                      {member.full_name}
-                    </div>
-                  </td>
-                  <td data-label="Email">{member.email}</td>
-                  <td data-label="Role"><span className="timeline-category-badge">{member.role}</span></td>
-                  <td data-label="Status">
-                    <span className={`status-badge ${member.approval_status}`}>
-                      {member.approval_status}
-                    </span>
-                  </td>
-                  <td data-label="Actions" className="actions-cell">
-                    {member.approval_status === 'pending' ? (
-                      <>
-                        <button onClick={() => handleApprove(member.user_id)} className="action-btn success" title="Approve">
-                          <HiOutlineCheck />
+              {sortedMembers.map((member) => {
+                const status = (member.approval_status || 'pending').toLowerCase();
+                const isPending = status === 'pending' || status === 'unapproved';
+
+                return (
+                  <tr 
+                    key={member.id} 
+                    style={isPending ? { background: 'rgba(245, 158, 11, 0.06)' } : {}}
+                  >
+                    <td data-label="Name">
+                      <div className="font-medium" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <HiOutlineUserGroup style={{ color: isPending ? '#f59e0b' : 'var(--admin-primary)' }} />
+                        <span>{member.full_name || 'Member'}</span>
+                        {isPending && (
+                          <span style={{ 
+                            fontSize: '0.7rem', 
+                            padding: '2px 6px', 
+                            background: 'rgba(245, 158, 11, 0.2)', 
+                            color: '#f59e0b', 
+                            borderRadius: '4px', 
+                            fontWeight: 700 
+                          }}>
+                            PENDING
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td data-label="Email">{member.email || '—'}</td>
+                    <td data-label="Role"><span className="timeline-category-badge">{member.role}</span></td>
+                    <td data-label="Status">
+                      <span className={`status-badge ${status === 'approved' ? 'approved' : status === 'rejected' ? 'rejected' : 'pending'}`}>
+                        {status}
+                      </span>
+                    </td>
+                    <td data-label="Actions" className="actions-cell">
+                      {isPending ? (
+                        <>
+                          <button 
+                            onClick={() => handleApprove(member.user_id, member.full_name)} 
+                            className="action-btn success" 
+                            title="Approve Member"
+                          >
+                            <HiOutlineCheck />
+                          </button>
+                          <button 
+                            onClick={() => handleReject(member.user_id, member.full_name)} 
+                            className="action-btn delete" 
+                            title="Reject Member"
+                          >
+                            <HiOutlineX />
+                          </button>
+                        </>
+                      ) : (
+                        <button onClick={() => handleRemove(member.id)} className="action-btn delete" title="Remove Member">
+                          <HiOutlineTrash />
                         </button>
-                        <button onClick={() => handleReject(member.user_id)} className="action-btn delete" title="Reject">
-                          <HiOutlineX />
-                        </button>
-                      </>
-                    ) : (
-                      <button onClick={() => handleRemove(member.id)} className="action-btn delete" title="Remove Member">
-                        <HiOutlineTrash />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
