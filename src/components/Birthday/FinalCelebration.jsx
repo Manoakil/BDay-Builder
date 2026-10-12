@@ -89,6 +89,10 @@ export default function FinalCelebration({ eventId, birthdayName, onReplay, wish
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         eventId={eventId}
+        birthdayName={birthdayName}
+        wishes={wishes}
+        videoWishes={videoWishes}
+        timeline={timeline}
         stats={{
           wishes: wishes.length + videoWishes.length,
           memories: timeline.length,

@@ -18,7 +18,6 @@ import WishesIntro from "../components/Birthday/WishesIntro";
 import WishWall from "../components/Birthday/WishWall";
 import VideoWishes from "../components/Birthday/VideoWishes";
 import MemoryTimeline from "../components/Birthday/MemoryTimeline";
-import SecretVault from "../components/Birthday/SecretVault";
 import FinalCelebration from "../components/Birthday/FinalCelebration";
 import CupidScroller from "../components/Birthday/CupidScroller";
 import ScrollReveal from "../components/Birthday/ScrollReveal";
@@ -124,16 +123,7 @@ export default function BirthdayPerson() {
       .finally(() => setLoading(false));
   }, [step, pageAccessible, event]);
 
-  const handleUnlockVault = async (answer) => {
-    const result = await attemptBirthdayVault(vault.id, answer);
-    if (result.unlocked) {
-      setVault({ ...vault, unlock_time: new Date().toISOString(), is_locked: false });
-      // Redirect to the dedicated vault page
-      setTimeout(() => navigate(`/vault/${event.id}`), 100);
-    } else {
-      throw new Error("Incorrect answer");
-    }
-  };
+
 
   const handleReplay = () => {
     window.scrollTo({ top: 0 });
@@ -214,7 +204,7 @@ const videoWishes = wishes.filter(w => w.wish_type === 'video');
         {step === 'main' && (
         <>
           <CupidScroller />
-          <BirthdayNavbar birthdayName={birthdayName} hasVault={!!vault} enableWishes={enableWishes} enableVideos={enableVideos} enableTimeline={enableTimeline} />
+          <BirthdayNavbar birthdayName={birthdayName} hasVault={false} enableWishes={enableWishes} enableVideos={enableVideos} enableTimeline={enableTimeline} />
           
           <ScrollReveal>
             <PersonalMessage />
@@ -252,12 +242,6 @@ const videoWishes = wishes.filter(w => w.wish_type === 'video');
             )
           )}
 
-          {vault && orgSettings?.vault_enabled && (localStorage.getItem('role') === 'org_admin' || localStorage.getItem('role') === 'bday_person' || localStorage.getItem('role') === 'birthday_person' || localStorage.getItem('role')?.includes('admin')) && (
-            <ScrollReveal delay={0.3}>
-              <SecretVault vault={vault} onUnlock={handleUnlockVault} />
-            </ScrollReveal>
-          )}
-
           <ScrollReveal direction="up">
             <FinalCelebration 
               eventId={event.id}
@@ -266,8 +250,8 @@ const videoWishes = wishes.filter(w => w.wish_type === 'video');
               wishes={textWishes} 
               videoWishes={videoWishes}
               timeline={timeline}
-              vault={orgSettings?.vault_enabled ? vault : null}
-              vaultUnlocked={true} // Always include vault in offline download so they don't lose the secret
+              vault={null}
+              vaultUnlocked={false}
               orgSettings={orgSettings}
             />
           </ScrollReveal>

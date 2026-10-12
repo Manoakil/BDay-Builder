@@ -62,12 +62,9 @@ function App() {
           </ProtectedRoute>
         } />
 
-        {/* Vault Page */}
-        <Route path="/vault/:eventId" element={
-          <ProtectedRoute allowedRoles={["bday_person", "birthday_person", "bday-person", "wisher"]}>
-            <VaultWishes />
-          </ProtectedRoute>
-        } />
+        {/* Dedicated Secret Vault Page (Question Challenge Protected) */}
+        <Route path="/vault" element={<VaultWishes />} />
+        <Route path="/vault/:eventId" element={<VaultWishes />} />
 
         {/* Legacy redirect for old hardcoded routes if needed */}
         <Route path="/wishes" element={<Navigate to="/birthday/default" replace />} />

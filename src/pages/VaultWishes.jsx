@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import "../style/VaultWishes.css";
 import { getBirthdayVault, attemptBirthdayVault } from "../service/wishService";
 import { API_BASE_URL } from "../service/authService";
+import { generateVaultWishHtml } from "../utils/generateOfflineHtml";
 
 import ScrollReveal from "../components/Birthday/ScrollReveal";
 import WishCard from "../components/Birthday/WishCard";
@@ -15,6 +16,12 @@ function VaultWishes({ isOffline, offlineVaultData, offlineEventData, onBack }) 
   const [vaultData, setVaultData] = useState(null);
   const [eventData, setEventData] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Vault Unlock State
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [challengeAnswer, setChallengeAnswer] = useState("");
+  const [unlocking, setUnlocking] = useState(false);
+  const [unlockError, setUnlockError] = useState("");
 
   const [started, setStarted] = useState(false);
   const [activeMemory, setActiveMemory] = useState(null);
@@ -29,7 +36,7 @@ function VaultWishes({ isOffline, offlineVaultData, offlineEventData, onBack }) 
   const noButtonRef = useRef(null);
 
   useEffect(() => {
-    document.title = "Wish Land";
+    document.title = "Wish Land • The Secret Vault";
     return () => {
       document.title = "Velora Studio";
     };
@@ -39,13 +46,56 @@ function VaultWishes({ isOffline, offlineVaultData, offlineEventData, onBack }) 
     if (isOffline) {
       setVaultData(offlineVaultData);
       setEventData(offlineEventData);
+      setIsUnlocked(true);
       setLoading(false);
       return;
     }
+
     const fetchData = async () => {
       try {
-        const [vault, evRes, wisherRes, secretWishesData] = await Promise.all([
-          getBirthdayVault(eventId).catch(() => null),
+        const searchStr = window.location.search || "";
+        const searchParams = new URLSearchParams(searchStr);
+        let vaultId = searchParams.get("vault_id") || searchParams.get("vaultid") || searchParams.get("vault");
+        let orgId = searchParams.get("org_id") || searchParams.get("orgid") || searchParams.get("org");
+        let eventIdParam = eventId || searchParams.get("event_id") || searchParams.get("eventid") || searchParams.get("event");
+
+        // Support concatenated or raw formats like ?orgidvaultid or multiple UUIDs in query string
+        const uuidMatches = searchStr.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g) || [];
+        if (uuidMatches.length >= 2) {
+          if (!orgId) orgId = uuidMatches[0];
+          if (!vaultId) vaultId = uuidMatches[1];
+        } else if (uuidMatches.length === 1) {
+          if (!vaultId && !eventIdParam && !orgId) {
+            vaultId = uuidMatches[0];
+          }
+        }
+        const rawQuery = searchStr.replace(/^\?/, "").trim();
+
+        let loadedVault = null;
+        let loadedEvent = null;
+
+        // 1. Flexible lookup by vaultId, eventIdParam, orgId, or rawQuery
+        const lookupTarget = vaultId || eventIdParam || orgId || rawQuery;
+        if (lookupTarget) {
+          try {
+            const lookupRes = await fetch(`${API_BASE_URL}/vault/lookup/${lookupTarget}`);
+            if (lookupRes.ok) {
+              const lookupData = await lookupRes.json();
+              if (lookupData.vault) loadedVault = lookupData.vault;
+              if (lookupData.event) loadedEvent = lookupData.event;
+            }
+          } catch (err) {
+            console.warn("Vault lookup failed:", err);
+          }
+        }
+
+        // 2. Direct event-based fallback
+        if (!loadedVault && (eventIdParam || eventId)) {
+          loadedVault = await getBirthdayVault(eventIdParam || eventId).catch(() => null);
+        }
+
+        // 3. User session context
+        const [evRes, wisherRes, secretWishesData] = await Promise.all([
           fetch(`${API_BASE_URL}/events/my-birthday-event`, {
             headers: { "Authorization": `Bearer ${localStorage.getItem("access_token")}` }
           }).then(r => r.ok ? r.json() : null).catch(() => null),
@@ -56,13 +106,21 @@ function VaultWishes({ isOffline, offlineVaultData, offlineEventData, onBack }) 
             headers: { "Authorization": `Bearer ${localStorage.getItem("access_token")}` }
           }).then(r => r.ok ? r.json() : null).catch(() => null)
         ]);
-        if (vault) {
-          setVaultData({ ...vault, secret_wishes: secretWishesData || [] });
+
+        if (loadedVault) {
+          setVaultData({ ...loadedVault, secret_wishes: secretWishesData || [] });
+          // If already has dynamic content or previously unlocked
+          const alreadyUnlocked = Boolean(
+            loadedVault.dynamic_data && 
+            (loadedVault.dynamic_data.timeline?.length > 0 || 
+             loadedVault.dynamic_data.confessionText || 
+             loadedVault.dynamic_data.letterParagraphs?.length > 0)
+          );
+          setIsUnlocked(alreadyUnlocked);
         }
 
-        // Find best fallback name and slug
-        let bestName = "Her Name";
-        let bestSlug = "";
+        let bestName = loadedEvent?.birthday_person_name || "Birthday Star";
+        let bestSlug = loadedEvent?.slug || "";
 
         if (evRes) {
           if (evRes.birthday_person_name) bestName = evRes.birthday_person_name;
@@ -73,7 +131,6 @@ function VaultWishes({ isOffline, offlineVaultData, offlineEventData, onBack }) 
         }
 
         setEventData({ birthday_person_name: bestName, slug: bestSlug });
-
       } catch (e) {
         console.error(e);
       } finally {
@@ -84,14 +141,62 @@ function VaultWishes({ isOffline, offlineVaultData, offlineEventData, onBack }) 
   }, [eventId, isOffline, offlineVaultData, offlineEventData]);
 
   useEffect(() => {
-    document.body.classList.toggle("bb-lock", !started);
+    document.body.classList.toggle("bb-lock", !started && isUnlocked);
     return () => {
       document.body.classList.remove("bb-lock");
     };
-  }, [started]);
+  }, [started, isUnlocked]);
 
-  if (loading) return <div style={{ color: 'black', textAlign: 'center', marginTop: '20vh' }}>Loading...</div>;
-  if (!vaultData) return <div style={{ color: 'white', textAlign: 'center', marginTop: '20vh' }}>Vault not found</div>;
+  const handleUnlockAttempt = async (e) => {
+    if (e) e.preventDefault();
+    if (!challengeAnswer.trim() || !vaultData?.id) return;
+    setUnlocking(true);
+    setUnlockError("");
+
+    try {
+      const res = await attemptBirthdayVault(vaultData.id, challengeAnswer.trim());
+      if (res && res.unlocked) {
+        const updatedVault = res.vault || {};
+        setVaultData((prev) => ({
+          ...prev,
+          ...updatedVault,
+          dynamic_data: updatedVault.dynamic_data || prev?.dynamic_data || {},
+          unlock_message: updatedVault.unlock_message || prev?.unlock_message,
+          unlock_media_url: updatedVault.unlock_media_url || prev?.unlock_media_url,
+        }));
+        setIsUnlocked(true);
+        setStarted(true);
+      } else {
+        setUnlockError("That's not the secret key. Think back to that special memory and try again!");
+      }
+    } catch (err) {
+      setUnlockError(err.message || "Incorrect secret answer. Try again!");
+    } finally {
+      setUnlocking(false);
+    }
+  };
+
+  if (loading) return <div style={{ color: 'black', textAlign: 'center', marginTop: '20vh' }}>Loading the secret vault...</div>;
+  if (!vaultData) {
+    return (
+      <div className="bb-vault-challenge-screen">
+        <div className="bb-vault-challenge-card">
+          <div className="bb-vault-challenge-icon">🗝️</div>
+          <h2 className="bb-vault-challenge-title">Vault Not Found</h2>
+          <p className="bb-vault-challenge-subtitle">
+            This secret vault link may have expired or is not active yet.
+          </p>
+          <button 
+            className="bb-vault-unlock-btn" 
+            onClick={() => navigate("/")}
+            style={{ marginTop: '16px' }}
+          >
+            Go to Celebration
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const dynamic = vaultData.dynamic_data || {};
   const fallbackBdayName = eventData?.birthday_person_name || "Her Name";
@@ -172,8 +277,96 @@ function VaultWishes({ isOffline, offlineVaultData, offlineEventData, onBack }) 
   };
 
 
+  // If Vault is Locked, present the Secret Question Challenge Screen
+  if (!isUnlocked) {
+    return (
+      <div className="bb-vault-challenge-screen">
+        <div className="bb-vault-challenge-card">
+          <div className="bb-vault-challenge-icon">🔒</div>
+          <span className="bb-vault-challenge-badge">Special Delivery</span>
+          <h1 className="bb-vault-challenge-title">The Secret Vault</h1>
+          <p className="bb-vault-challenge-subtitle">
+            A secret wish was kept safe here for <strong style={{ color: "#ffd166" }}>{HER_NAME}</strong>. Only the birthday star can answer the secret key to open it.
+          </p>
+
+          <div className="bb-vault-question-box">
+            <span className="bb-vault-q-label">Secret Challenge Question</span>
+            <p className="bb-vault-q-text">
+              "{vaultData.question || 'What is our special secret?'}"
+            </p>
+            {vaultData.hint && (
+              <div className="bb-vault-hint-text">
+                💡 Clue: {vaultData.hint}
+              </div>
+            )}
+          </div>
+
+          <form onSubmit={handleUnlockAttempt} className="bb-vault-answer-form">
+            <input
+              type="text"
+              className="bb-vault-answer-input"
+              placeholder="Enter your secret answer..."
+              value={challengeAnswer}
+              onChange={(e) => {
+                setChallengeAnswer(e.target.value);
+                setUnlockError("");
+              }}
+              disabled={unlocking}
+              autoFocus
+            />
+            {unlockError && (
+              <div className="bb-vault-error-msg">
+                {unlockError}
+              </div>
+            )}
+            <button
+              type="submit"
+              className="bb-vault-unlock-btn"
+              disabled={unlocking || !challengeAnswer.trim()}
+            >
+              {unlocking ? "Verifying Secret..." : "Unlock Vault ✨"}
+            </button>
+          </form>
+
+          <div style={{ marginTop: "24px" }}>
+            <button
+              onClick={() => {
+                if (eventData?.slug) {
+                  navigate(`/birthday/${eventData.slug}`);
+                } else {
+                  navigate("/");
+                }
+              }}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "rgba(255,255,255,0.6)",
+                cursor: "pointer",
+                fontSize: "0.85rem",
+                textDecoration: "underline"
+              }}
+            >
+              ← Back to Celebration
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <main className="bb-page">
+
+      {/* Floating Download Keepsake Button */}
+      <div className="bb-vault-topbar">
+        <button
+          onClick={() => generateVaultWishHtml(HER_NAME, vaultData, YOUR_NAME)}
+          className="bb-vault-download-btn"
+          title="Download Vault Wish Keepsake"
+        >
+          📥 Download Vault Wish
+        </button>
+      </div>
 
       {/* ================================================================
           OPENING
@@ -852,7 +1045,23 @@ function VaultWishes({ isOffline, offlineVaultData, offlineEventData, onBack }) 
             </p>
             <br />
 
-            <div>
+            <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap", marginTop: "10px" }}>
+              <button
+                onClick={() => generateVaultWishHtml(HER_NAME, vaultData, YOUR_NAME)}
+                style={{
+                  background: "linear-gradient(135deg, #ffd166 0%, #e6a836 100%)",
+                  border: "none",
+                  color: "#3b1e08",
+                  padding: "10px 24px",
+                  borderRadius: "30px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  fontSize: "0.9rem",
+                  boxShadow: "0 4px 15px rgba(255, 209, 102, 0.4)"
+                }}
+              >
+                📥 Download Vault Wish
+              </button>
               <button
                 onClick={() => {
                   if (isOffline && onBack) {

@@ -1576,3 +1576,198 @@ img {
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ==========================================================================
+   VAULT CHALLENGE LOCK SCREEN & DOWNLOAD BUTTON
+   ========================================================================== */
+.bb-vault-challenge-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 30%, #2a101f 0%, #12050e 100%);
+  color: #fff;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.bb-vault-challenge-card {
+  width: 100%;
+  max-width: 520px;
+  background: rgba(36, 16, 30, 0.85);
+  border: 1px solid rgba(255, 209, 102, 0.25);
+  backdrop-filter: blur(16px);
+  border-radius: 24px;
+  padding: 44px 32px;
+  text-align: center;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(230, 57, 110, 0.15);
+  animation: revealFadeIn 0.8s ease forwards;
+}
+
+.bb-vault-challenge-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  filter: drop-shadow(0 4px 15px rgba(255, 209, 102, 0.4));
+  animation: pulseLock 2s infinite ease-in-out;
+}
+
+@keyframes pulseLock {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+.bb-vault-challenge-badge {
+  display: inline-block;
+  padding: 5px 16px;
+  background: rgba(230, 57, 110, 0.15);
+  border: 1px solid rgba(230, 57, 110, 0.4);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #fca5a5;
+  margin-bottom: 16px;
+}
+
+.bb-vault-challenge-title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 2.4rem;
+  color: #fff;
+  margin: 0 0 12px;
+}
+
+.bb-vault-challenge-subtitle {
+  color: #d1b8c6;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0 0 28px;
+}
+
+.bb-vault-question-box {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px dashed rgba(255, 209, 102, 0.35);
+  border-radius: 16px;
+  padding: 20px 18px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.bb-vault-q-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #ffd166;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.bb-vault-q-text {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.25rem;
+  font-style: italic;
+  color: #fff;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.bb-vault-hint-text {
+  margin-top: 10px;
+  font-size: 0.85rem;
+  color: #fbcfe8;
+  font-style: normal;
+}
+
+.bb-vault-answer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bb-vault-answer-input {
+  width: 100%;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 1.05rem;
+  outline: none;
+  transition: all 0.3s;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.bb-vault-answer-input:focus {
+  border-color: #ffd166;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 15px rgba(255, 209, 102, 0.25);
+}
+
+.bb-vault-error-msg {
+  color: #ff6b81;
+  font-size: 0.9rem;
+  margin: -4px 0 4px;
+  animation: shake 0.4s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+.bb-vault-unlock-btn {
+  padding: 16px 24px;
+  background: linear-gradient(135deg, #e6396e 0%, #a9283f 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 10px 25px rgba(230, 57, 110, 0.4);
+  transition: all 0.3s;
+}
+
+.bb-vault-unlock-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(230, 57, 110, 0.55);
+}
+
+.bb-vault-unlock-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.bb-vault-topbar {
+  position: fixed;
+  top: 18px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  gap: 12px;
+}
+
+.bb-vault-download-btn {
+  background: linear-gradient(135deg, #ffd166 0%, #e6a836 100%);
+  color: #3b1e08;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(255, 209, 102, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s;
+}
+
+.bb-vault-download-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(255, 209, 102, 0.5);
+}
+

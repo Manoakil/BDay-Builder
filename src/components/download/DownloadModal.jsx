@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { API_BASE_URL, getAuthHeaders } from '../../service/authService';
+import { generateOfflineHtml } from '../../utils/generateOfflineHtml';
 import './DownloadModal.css';
 
-export default function DownloadModal({ isOpen, onClose, eventId, stats }) {
+export default function DownloadModal({ isOpen, onClose, eventId, birthdayName = "Birthday Star", wishes = [], videoWishes = [], timeline = [], stats }) {
   const [step, setStep] = useState('prompt'); // prompt, generating, success
   const [progressIndex, setProgressIndex] = useState(0);
 
@@ -39,16 +40,14 @@ export default function DownloadModal({ isOpen, onClose, eventId, stats }) {
       });
       
       if (!response.ok) {
-        throw new Error("Failed to generate package");
+        throw new Error("Failed to generate package from server, using fallback");
       }
       
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      // The filename can be extracted from content-disposition header if needed,
-      // but we can just use a fallback
-      link.setAttribute('download', `offline-celebration.zip`);
+      link.setAttribute('download', `birthday-celebration.zip`);
       document.body.appendChild(link);
       link.click();
       
@@ -57,9 +56,15 @@ export default function DownloadModal({ isOpen, onClose, eventId, stats }) {
       
       setStep('success');
     } catch (error) {
-      console.error("Failed to generate offline package:", error);
-      alert("Some parts of your celebration couldn't be prepared. Please try again.");
-      setStep('prompt');
+      console.warn("Server offline package unavailable, generating standalone celebration file:", error);
+      try {
+        generateOfflineHtml(birthdayName, wishes, videoWishes, timeline);
+        setStep('success');
+      } catch (clientErr) {
+        console.error("Client generation error:", clientErr);
+        alert("Some parts of your celebration couldn't be prepared. Please try again.");
+        setStep('prompt');
+      }
     }
   };
 

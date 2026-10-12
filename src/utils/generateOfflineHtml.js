@@ -1,281 +1,227 @@
-export const generateOfflineHtml = (birthdayName, wishes = [], videoWishes = [], timeline = [], vault = null, vaultUnlocked = false) => {
-  // Sort timeline by date
+// Date formatter helper
+const formatMemoryDate = (dateStr, tags = []) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  let precision = 'day';
+  if (tags && tags.length) {
+    const precisionTag = tags.find(t => typeof t === 'string' && t.startsWith('precision:'));
+    if (precisionTag) precision = precisionTag.split(':')[1];
+  } else {
+    const parts = dateStr.split('-');
+    if (parts.length === 1) precision = 'year';
+    if (parts.length === 2) precision = 'month';
+  }
+  if (precision === 'year') return date.getFullYear().toString();
+  if (precision === 'month') return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(date);
+  return new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'long', year: 'numeric' }).format(date);
+};
+
+/**
+ * Generates and downloads the NORMAL Celebration page offline keepsake.
+ * Contains text wishes, video memories, and memory timeline.
+ * Does NOT include the secret vault wish.
+ */
+export const generateOfflineHtml = (birthdayName, wishes = [], videoWishes = [], timeline = []) => {
   const sortedTimeline = [...timeline].sort((a, b) => new Date(a.entry_date) - new Date(b.entry_date));
-
-  // Date formatter
-  const formatMemoryDate = (dateStr, tags = []) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return dateStr;
-    let precision = 'day';
-    if (tags && tags.length) {
-      const precisionTag = tags.find(t => typeof t === 'string' && t.startsWith('precision:'));
-      if (precisionTag) precision = precisionTag.split(':')[1];
-    } else {
-      const parts = dateStr.split('-');
-      if (parts.length === 1) precision = 'year';
-      if (parts.length === 2) precision = 'month';
-    }
-    if (precision === 'year') return date.getFullYear().toString();
-    if (precision === 'month') return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(date);
-    return new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'long', year: 'numeric' }).format(date);
-  };
-
-  const dyn = vault?.dynamic_data || {};
-  const confessionTitle = dyn.confession_title || vault?.unlock_message || "A Little Secret";
-  const confessionBody = dyn.confession_body || "";
-  const letterTitle = dyn.letter_title || "";
-  const letterBody = dyn.letter_body || "";
-  const thingsILove = dyn.things_i_love || [];
-  const memories = dyn.memories || [];
 
   const css = `
     :root {
-      --bg: #1a1016;
+      --bg: #140d18;
       --text: #fdfaf6;
-      --accent: #ff4d8d;
-      --card-bg: #2b1d24;
-      --gold: #ffd166;
+      --accent: #f43f5e;
+      --card-bg: #221626;
+      --gold: #fbbf24;
+      --border: rgba(244, 63, 94, 0.2);
     }
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       padding: 0;
-      background-color: var(--bg);
+      background: radial-gradient(circle at top, #24142a 0%, #0d0810 100%);
       color: var(--text);
       font-family: 'Poppins', sans-serif;
       overflow-x: hidden;
+      min-height: 100vh;
     }
     .container {
-      max-width: 900px;
+      max-width: 960px;
       margin: 0 auto;
-      padding: 60px 20px;
+      padding: 60px 24px 100px;
     }
     .header {
       text-align: center;
-      margin-bottom: 80px;
+      margin-bottom: 70px;
+    }
+    .header-badge {
+      display: inline-block;
+      padding: 6px 18px;
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid rgba(244, 63, 94, 0.4);
+      border-radius: 999px;
+      font-size: 0.85rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #fda4af;
+      margin-bottom: 16px;
     }
     .header h1 {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 4rem;
-      color: var(--accent);
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 3.5rem;
+      color: #fff;
       margin: 0;
+      line-height: 1.1;
+      text-shadow: 0 4px 20px rgba(244, 63, 94, 0.3);
     }
     .header p {
-      font-family: 'Great Vibes', cursive;
-      font-size: 2rem;
+      font-family: 'Playfair Display', Georgia, serif;
+      font-style: italic;
+      font-size: 1.8rem;
       color: var(--gold);
-      margin: -10px 0 0 0;
+      margin: 10px 0 0 0;
     }
-    
     .section-title {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 2.5rem;
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 2.2rem;
       text-align: center;
-      margin: 60px 0 40px;
-      border-bottom: 1px solid rgba(255, 77, 141, 0.3);
-      padding-bottom: 15px;
+      margin: 70px 0 35px;
+      color: #fff;
+      position: relative;
     }
-
-    /* Beautiful Wishes (Letter style) */
+    .section-title::after {
+      content: '';
+      display: block;
+      width: 60px;
+      height: 2px;
+      background: var(--accent);
+      margin: 14px auto 0;
+      border-radius: 2px;
+    }
     .wishes-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-      gap: 30px;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 24px;
     }
     .wish-card {
-      background: linear-gradient(rgba(120,80,60,.035) 1px, transparent 1px);
-      background-size: 100% 31px;
-      background-color: #fbf0dd;
-      border-radius: 4px;
-      padding: 40px 30px;
-      box-shadow: 0 15px 35px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(150,100,60,.08);
-      color: #5e4030;
+      background: rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
     .wish-card img {
       width: 100%;
       height: 200px;
       object-fit: cover;
-      border-radius: 4px;
-      margin-bottom: 20px;
+      border-radius: 10px;
+      margin-bottom: 16px;
     }
     .wish-message {
-      font-family: 'Caveat', cursive;
-      font-size: 1.5rem;
-      line-height: 1.5;
+      font-size: 1rem;
+      line-height: 1.7;
+      color: #f3e8f0;
+      margin-bottom: 18px;
       white-space: pre-wrap;
-      color: #594541;
-      margin-bottom: 20px;
     }
     .wish-author {
-      font-family: 'Caveat', cursive;
-      font-size: 1.8rem;
+      font-size: 0.95rem;
+      color: var(--gold);
       font-weight: 600;
-      color: #ff4d8d;
       text-align: right;
     }
-
-    /* Video Wishes */
     .video-card {
-      background: var(--card-bg);
-      border-radius: 12px;
-      padding: 25px;
-      border: 1px solid rgba(255,255,255,0.05);
-      text-align: center;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     }
     .video-card video {
       width: 100%;
-      border-radius: 8px;
-      margin-bottom: 15px;
+      border-radius: 10px;
       background: #000;
+      max-height: 260px;
     }
-
-    /* Timeline */
     .timeline {
       position: relative;
-      padding: 20px 0;
-    }
-    .timeline::before {
-      content: '';
-      position: absolute;
-      left: 20px;
-      top: 0;
-      bottom: 0;
-      width: 2px;
-      background: rgba(255, 77, 141, 0.3);
+      max-width: 720px;
+      margin: 0 auto;
+      padding-left: 28px;
+      border-left: 2px solid rgba(244, 63, 94, 0.3);
     }
     .timeline-item {
       position: relative;
-      padding-left: 60px;
       margin-bottom: 40px;
     }
     .timeline-item::before {
-      content: '✦';
+      content: '';
       position: absolute;
-      left: 8px;
-      top: 2px;
-      width: 26px;
-      height: 26px;
+      left: -35px;
+      top: 4px;
+      width: 12px;
+      height: 12px;
       border-radius: 50%;
-      background: #fff8fb;
-      color: #ff4d8d;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      box-shadow: 0 0 0 3px #fff8fb;
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
     }
     .timeline-date {
-      font-weight: 600;
-      color: #ff4d8d;
-      margin-bottom: 5px;
-      display: block;
-      letter-spacing: 1.5px;
+      font-size: 0.85rem;
+      color: var(--gold);
       text-transform: uppercase;
-      font-size: 0.8rem;
+      letter-spacing: 1px;
+      display: block;
+      margin-bottom: 6px;
     }
     .timeline-title {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 1.8rem;
-      margin: 0 0 10px 0;
-      color: #ffd166;
+      font-family: 'Playfair Display', serif;
+      font-size: 1.4rem;
+      color: #fff;
+      margin: 0 0 8px;
     }
     .timeline-desc {
-      color: #e0d0d5;
+      font-size: 0.95rem;
+      color: #d1c5d3;
       line-height: 1.6;
+      margin-bottom: 12px;
     }
     .timeline-img {
       max-width: 100%;
-      border-radius: 12px;
-      margin-top: 15px;
-      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      margin-top: 10px;
     }
-
-    /* Vault / Secret Confession */
-    .vault-section {
-      margin-top: 80px;
-      background: linear-gradient(145deg, #2b111a, #1a0a10);
-      border: 1px solid #ff4d8d;
-      padding: 50px;
-      border-radius: 20px;
-      text-align: center;
-    }
-    .vault-section h2 {
-      color: #ff4d8d;
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 3rem;
-      margin-top: 0;
-      margin-bottom: 20px;
-    }
-    .vault-message {
-      font-size: 1.2rem;
-      line-height: 1.8;
-      font-style: italic;
-      color: #e0d0d5;
-      margin-bottom: 30px;
-      white-space: pre-wrap;
-    }
-    .vault-letter {
-      background: #fbf0dd;
-      padding: 40px;
-      border-radius: 4px;
-      color: #5e4030;
-      text-align: left;
-      margin-top: 40px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-    }
-    .vault-letter h3 {
-      font-family: 'Caveat', cursive;
-      font-size: 2.5rem;
-      color: #ff0000;
-      margin-top: 0;
-    }
-    .vault-letter p {
-      font-family: 'Caveat', cursive;
-      font-size: 1.5rem;
-      white-space: pre-wrap;
-    }
-    .things-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 15px;
-      margin-top: 30px;
-    }
-    .thing-card {
-      background: rgba(255,77,141,0.1);
-      border: 1px solid rgba(255,77,141,0.3);
-      padding: 15px;
-      border-radius: 8px;
-      font-size: 1.1rem;
-    }
-
     .footer {
       text-align: center;
-      margin-top: 100px;
-      padding: 40px 0;
-      color: #666;
+      margin-top: 80px;
+      padding-top: 30px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      color: #8d7a91;
       font-size: 0.9rem;
     }
   `;
 
-  const html = `
-<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Wish Land</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Great+Vibes&family=Poppins:wght@300;400;600&family=Caveat:wght@400;600;700&display=swap" rel="stylesheet">
+  <title>Birthday Celebration • ${birthdayName}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>${css}</style>
 </head>
 <body>
   <div class="container">
     <div class="header">
+      <div class="header-badge">Celebration Keepsake</div>
       <h1>Happy Birthday</h1>
-      <p>${birthdayName}</p>
+      <p>${birthdayName} ♡</p>
     </div>
 
     ${wishes.length > 0 ? `
-      <h2 class="section-title">Wishes from the Heart</h2>
+      <h2 class="section-title">Wishes from Everyone</h2>
       <div class="wishes-grid">
         ${wishes.map(wish => `
           <div class="wish-card">
@@ -288,13 +234,13 @@ export const generateOfflineHtml = (birthdayName, wishes = [], videoWishes = [],
     ` : ''}
 
     ${videoWishes.length > 0 ? `
-      <h2 class="section-title">Video Memories</h2>
+      <h2 class="section-title">Video Wishes</h2>
       <div class="wishes-grid">
         ${videoWishes.map(video => `
           <div class="video-card">
             <video src="${video.media_url}" controls preload="metadata"></video>
-            <div class="wish-author" style="text-align: center; color: #ffd166;">— ${video.wisher_name || 'Someone special'}</div>
-            ${video.content ? `<div class="wish-message" style="margin-top: 15px; color: #e0d0d5;">${video.content}</div>` : ''}
+            <div class="wish-author" style="margin-top: 12px; text-align: right;">— ${video.wisher_name || 'Someone special'}</div>
+            ${video.content ? `<div class="wish-message" style="margin-top: 10px;">${video.content}</div>` : ''}
           </div>
         `).join('')}
       </div>
@@ -314,45 +260,257 @@ export const generateOfflineHtml = (birthdayName, wishes = [], videoWishes = [],
       </div>
     ` : ''}
 
-    ${(vault && vaultUnlocked && (vault.unlock_message || confessionBody || letterBody)) ? `
-      <div class="vault-section">
-        <h2>${confessionTitle}</h2>
-        
-        ${confessionBody ? `<div class="vault-message">${confessionBody}</div>` : ''}
-        ${!confessionBody && vault.unlock_message ? `<div class="vault-message">${vault.unlock_message}</div>` : ''}
-        
-        ${vault.unlock_media_url ? `<img src="${vault.unlock_media_url}" class="timeline-img" alt="Vault Secret">` : ''}
-        
-        ${thingsILove.length > 0 ? `
-          <h3 style="color:#ffd166; font-family:'Cormorant Garamond',serif; font-size:2rem; margin-top:40px;">Things I Love About You</h3>
-          <div class="things-grid">
-            ${thingsILove.map(thing => `<div class="thing-card">${thing}</div>`).join('')}
-          </div>
-        ` : ''}
-        
-        ${letterBody ? `
-          <div class="vault-letter">
-            <h3>${letterTitle || 'To my dear,'}</h3>
-            <p>${letterBody}</p>
-          </div>
-        ` : ''}
-      </div>
-    ` : ''}
-
     <div class="footer">
-      Generated on ${new Date().toLocaleDateString()} • Made with ♡ by Birthday Builder
+      Happy Birthday, ${birthdayName} • Saved with love
     </div>
   </div>
 </body>
-</html>
-  `;
+</html>`;
 
-  // Trigger download
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = `${birthdayName}_Celebration.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+/**
+ * Generates and downloads the DEDICATED SECRET VAULT WISH offline keepsake.
+ * Contains the unlocked secret confession, letter, things I love, secret memories, and audio/media.
+ */
+export const generateVaultWishHtml = (birthdayName, vault, wisherName = "Your Secret Admirer") => {
+  const dyn = vault?.dynamic_data || {};
+  const confessionTitle = dyn.confession_title || vault?.unlock_message || "A Secret Kept Just for You";
+  const confessionBody = dyn.confession_body || dyn.confessionText || vault?.unlock_message || "";
+  const letterTitle = dyn.letter_title || `To ${birthdayName},`;
+  const letterBody = dyn.letter_body || (Array.isArray(dyn.letterParagraphs) ? dyn.letterParagraphs.join('\n\n') : "");
+  const thingsILove = dyn.things_i_love || dyn.littleThings || [];
+  const secretMemories = dyn.memories || dyn.timeline || [];
+  const fromName = dyn.wisher_name || wisherName || "Someone Who Adores You";
+
+  const css = `
+    :root {
+      --bg: #11050e;
+      --card-bg: #1c0a18;
+      --gold: #f6c872;
+      --rose: #e6396e;
+      --text: #fff6fa;
+      --text-muted: #d0b8c6;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 0;
+      background: radial-gradient(circle at 50% 10%, #290d23 0%, #11050e 100%);
+      color: var(--text);
+      font-family: 'Poppins', sans-serif;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 70px 24px 100px;
+    }
+    .seal-badge {
+      width: 70px;
+      height: 70px;
+      margin: 0 auto 24px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #f6c872 0%, #b88628 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+      box-shadow: 0 0 30px rgba(246, 200, 114, 0.4);
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+    .header h1 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 3.2rem;
+      color: #fff;
+      margin: 0 0 10px;
+      letter-spacing: -0.5px;
+    }
+    .header p {
+      font-family: 'Caveat', cursive, sans-serif;
+      font-size: 2rem;
+      color: var(--gold);
+      margin: 0;
+    }
+    .card {
+      background: rgba(28, 10, 24, 0.85);
+      border: 1px solid rgba(246, 200, 114, 0.25);
+      border-radius: 20px;
+      padding: 36px 32px;
+      margin-bottom: 40px;
+      box-shadow: 0 15px 45px rgba(0,0,0,0.5);
+    }
+    .card-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 2rem;
+      color: var(--gold);
+      margin-top: 0;
+      margin-bottom: 20px;
+      border-bottom: 1px solid rgba(246, 200, 114, 0.2);
+      padding-bottom: 12px;
+    }
+    .confession-text {
+      font-size: 1.15rem;
+      line-height: 1.85;
+      color: #fce7f3;
+      white-space: pre-wrap;
+    }
+    .letter-container {
+      background: #fbf3e4;
+      color: #4a2810;
+      border-radius: 8px;
+      padding: 45px 35px;
+      font-family: 'Caveat', cursive, sans-serif;
+      font-size: 1.7rem;
+      line-height: 1.6;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+      position: relative;
+    }
+    .letter-title {
+      font-size: 2.2rem;
+      margin-bottom: 20px;
+      color: #8b2500;
+      font-weight: 700;
+    }
+    .letter-sign {
+      text-align: right;
+      margin-top: 30px;
+      font-size: 2rem;
+      color: #8b2500;
+      font-weight: bold;
+    }
+    .things-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .thing-pill {
+      background: rgba(230, 57, 110, 0.12);
+      border: 1px solid rgba(230, 57, 110, 0.35);
+      padding: 16px 20px;
+      border-radius: 14px;
+      font-size: 0.98rem;
+      color: #ffd6e5;
+      line-height: 1.5;
+    }
+    .media-preview {
+      width: 100%;
+      border-radius: 14px;
+      margin-top: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .memory-item {
+      padding: 20px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .memory-item:last-child { border-bottom: none; }
+    .memory-date {
+      color: var(--gold);
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .memory-title {
+      font-size: 1.25rem;
+      color: #fff;
+      margin: 6px 0;
+      font-family: 'Playfair Display', serif;
+    }
+    .memory-desc {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 80px;
+      color: #9f768e;
+      font-size: 0.9rem;
+    }
+  `;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Secret Vault • For ${birthdayName}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>${css}</style>
+</head>
+<body>
+  <div class="container">
+    <div class="seal-badge">🗝️</div>
+    <div class="header">
+      <h1>The Secret Vault</h1>
+      <p>Reserved strictly for ${birthdayName} ♡</p>
+    </div>
+
+    ${confessionBody ? `
+      <div class="card">
+        <h2 class="card-title">${confessionTitle}</h2>
+        <div class="confession-text">${confessionBody}</div>
+        ${vault?.unlock_media_url ? `<img src="${vault.unlock_media_url}" class="media-preview" alt="Unlocked Memory">` : ''}
+      </div>
+    ` : ''}
+
+    ${letterBody ? `
+      <div class="card" style="background: transparent; border: none; padding: 0;">
+        <div class="letter-container">
+          <div class="letter-title">${letterTitle}</div>
+          <div style="white-space: pre-wrap;">${letterBody}</div>
+          <div class="letter-sign">— ${fromName}</div>
+        </div>
+      </div>
+    ` : ''}
+
+    ${thingsILove.length > 0 ? `
+      <div class="card">
+        <h2 class="card-title">Things I Love About You</h2>
+        <div class="things-grid">
+          ${thingsILove.map(t => `<div class="thing-pill">♥ ${typeof t === 'string' ? t : t.title || t.text || ''}</div>`).join('')}
+        </div>
+      </div>
+    ` : ''}
+
+    ${secretMemories.length > 0 ? `
+      <div class="card">
+        <h2 class="card-title">Our Secret Moments</h2>
+        ${secretMemories.map(m => `
+          <div class="memory-item">
+            <span class="memory-date">${m.date || m.year || ''}</span>
+            <div class="memory-title">${m.title || ''}</div>
+            <div class="memory-desc">${m.description || m.desc || ''}</div>
+            ${m.image || m.media_url ? `<img src="${m.image || m.media_url}" class="media-preview" alt="Memory">` : ''}
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
+
+    <div class="footer">
+      A secret wish kept forever • For ${birthdayName}
+    </div>
+  </div>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${birthdayName}_Secret_Vault_Wish.html`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

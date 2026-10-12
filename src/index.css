@@ -98,3 +98,24 @@
     min-height: 100dvh !important;
   }
 }
+
+/* ===== HIDE NETLIFY BADGE / DRAWER WIDGET ===== */
+[data-netlify-drawer],
+netlify-drawer,
+#netlify-badge,
+.netlify-badge,
+[data-netlify-badge],
+div[class*="netlify-drawer" i],
+div[id*="netlify-badge" i],
+div[class*="netlify-feedback" i],
+iframe[title*="Netlify" i],
+iframe[src*="netlify" i] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  position: absolute !important;
+  left: -9999px !important;
+}
