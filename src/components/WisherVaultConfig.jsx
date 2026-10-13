@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { getBirthdayVault, getWisherAccessStatus, uploadMedia, getMyWishes, getMyTimeline } from "../service/wishService";
 import { API_BASE_URL } from "../service/authService";
-import { compressVideo, isLargeVideo, formatFileSize } from "../utils/videoCompressor";
+import { compressVideo, isLargeVideo, formatFileSize, fixWebmBlobDuration } from "../utils/videoCompressor";
 
 const WisherVaultConfig = () => {
   const [vault, setVault] = useState(null);
@@ -61,6 +61,7 @@ const WisherVaultConfig = () => {
   const streamRef = useRef(null);
   const wishMediaRecorderRef = useRef(null);
   const videoChunksRef = useRef([]);
+  const wishRecordingStartTimeRef = useRef(0);
 
   useEffect(() => {
     let interval = null;
@@ -68,11 +69,11 @@ const WisherVaultConfig = () => {
       interval = setInterval(() => {
         setVideoRecordingTime((prev) => prev + 1);
       }, 1000);
-    } else if (!isRecordingVideo && videoRecordingTime !== 0) {
-      clearInterval(interval);
     }
-    return () => clearInterval(interval);
-  }, [isRecordingVideo, videoRecordingTime]);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isRecordingVideo]);
 
   const formatTime = (timeInSeconds) => {
     const m = Math.floor(timeInSeconds / 60).toString().padStart(2, "0");
@@ -355,14 +356,18 @@ const WisherVaultConfig = () => {
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) videoChunksRef.current.push(e.data);
       };
-      recorder.onstop = () => {
-        const blob = new Blob(videoChunksRef.current, { type: recorder.mimeType || "video/webm" });
-        if (blob.size === 0) {
+      recorder.onstop = async () => {
+        const rawBlob = new Blob(videoChunksRef.current, { type: recorder.mimeType || "video/webm" });
+        if (rawBlob.size === 0) {
           alert("No video was recorded.");
           return;
         }
-        setWishVideoBlob(blob);
-        setWishVideoURL(URL.createObjectURL(blob));
+
+        const durationMs = Math.max(1000, Date.now() - wishRecordingStartTimeRef.current);
+        const fixedBlob = await fixWebmBlobDuration(rawBlob, durationMs);
+
+        setWishVideoBlob(fixedBlob);
+        setWishVideoURL(URL.createObjectURL(fixedBlob));
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((track) => track.stop());
           streamRef.current = null;
@@ -371,6 +376,7 @@ const WisherVaultConfig = () => {
         setIsRecordingVideo(false);
       };
       wishMediaRecorderRef.current = recorder;
+      wishRecordingStartTimeRef.current = Date.now();
       recorder.start(250);
       setVideoRecordingTime(0);
       setIsRecordingVideo(true);

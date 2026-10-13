@@ -13,6 +13,26 @@
  * - Framerate: 30 fps.
  */
 
+import fixWebmDuration from 'fix-webm-duration';
+
+/**
+ * Patches the missing EBML duration header in WebM blobs produced by Chrome/Edge MediaRecorder.
+ * This fixes the browser bug where recorded videos only show/play 10 seconds or cannot seek.
+ */
+export async function fixWebmBlobDuration(blob, durationMs) {
+  if (!blob || !durationMs || durationMs <= 0) return blob;
+  return new Promise((resolve) => {
+    try {
+      fixWebmDuration(blob, durationMs, (fixedBlob) => {
+        resolve(fixedBlob || blob);
+      });
+    } catch (err) {
+      console.warn("Could not patch WebM duration header, using original blob:", err);
+      resolve(blob);
+    }
+  });
+}
+
 /**
  * Returns true if a file is a video and exceeds the specified size threshold (default 100 MB).
  */

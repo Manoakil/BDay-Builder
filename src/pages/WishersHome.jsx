@@ -31,7 +31,7 @@ import {
   uploadMedia,
   getWisherAccessStatus,
 } from "../service/wishService";
-import { compressVideo, isLargeVideo, formatFileSize } from "../utils/videoCompressor";
+import { compressVideo, isLargeVideo, formatFileSize, fixWebmBlobDuration } from "../utils/videoCompressor";
 
 // ============================================================
 // CONSTANTS
@@ -241,6 +241,7 @@ function WishersHome() {
   const tlFileInputRef = useRef(null);
 
   const videoChunksRef = useRef([]);
+  const wishRecordingStartTimeRef = useRef(0);
 
   // ============================================================
   // ACCESS CHECK
@@ -642,19 +643,21 @@ function WishersHome() {
         }
       };
 
-      recorder.onstop = () => {
-        const blob = new Blob(videoChunksRef.current, {
+      recorder.onstop = async () => {
+        const rawBlob = new Blob(videoChunksRef.current, {
           type: recorder.mimeType || "video/webm",
         });
 
-        if (blob.size === 0) {
+        if (rawBlob.size === 0) {
           alert("No video was recorded.");
           return;
         }
 
-        const previewUrl = URL.createObjectURL(blob);
+        const durationMs = Math.max(1000, Date.now() - wishRecordingStartTimeRef.current);
+        const fixedBlob = await fixWebmBlobDuration(rawBlob, durationMs);
+        const previewUrl = URL.createObjectURL(fixedBlob);
 
-        setWishVideoBlob(blob);
+        setWishVideoBlob(fixedBlob);
         setWishVideoURL(previewUrl);
 
         if (streamRef.current) {
@@ -669,6 +672,7 @@ function WishersHome() {
 
       wishMediaRecorderRef.current = recorder;
 
+      wishRecordingStartTimeRef.current = Date.now();
       recorder.start(250);
 
       setVideoRecordingTime(0);
