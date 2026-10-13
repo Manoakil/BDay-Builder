@@ -369,7 +369,7 @@ function WishersHome() {
   // ============================================================
 
   useEffect(() => {
-    if (!isRecordingVideo && !tlIsRecording) {
+    if (!isRecordingVideo) {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -382,10 +382,6 @@ function WishersHome() {
       if (isRecordingVideo) {
         setVideoRecordingTime((previous) => previous + 1);
       }
-
-      if (tlIsRecording) {
-        setTlRecTime((previous) => previous + 1);
-      }
     }, 1000);
 
     return () => {
@@ -394,7 +390,7 @@ function WishersHome() {
         timerRef.current = null;
       }
     };
-  }, [isRecordingVideo, tlIsRecording]);
+  }, [isRecordingVideo]);
 
   // ============================================================
   // LOGOUT
@@ -1136,10 +1132,6 @@ function WishersHome() {
 
     setIsCameraOn(false);
     setIsRecordingVideo(false);
-
-    setTlShowCamera(false);
-    setTlCameraReady(false);
-    setTlIsRecVideo(false);
   };
 
   // ============================================================

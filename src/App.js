@@ -43,21 +43,21 @@ function App() {
         
         {/* Org Admin Dashboard */}
         <Route path="/admin/*" element={
-          <ProtectedRoute allowedRoles={["org_admin", "org-admin"]}>
+          <ProtectedRoute allowedRoles={["org_admin", "org-admin", "super_admin", "super-admin", "admin"]}>
             <AdminHome />
           </ProtectedRoute>
         } />
         
         {/* Wisher Portal */}
         <Route path="/wisher" element={
-          <ProtectedRoute allowedRoles={["wisher", "org_admin", "org-admin"]}>
+          <ProtectedRoute allowedRoles={["wisher", "org_admin", "org-admin", "super_admin", "super-admin", "admin"]}>
             <WishersHome />
           </ProtectedRoute>
         } />
 
         {/* Birthday Experience (Shared by Wisher and Birthday Person) */}
         <Route path="/birthday/:slug" element={
-          <ProtectedRoute allowedRoles={["bday_person", "birthday_person", "bday-person", "wisher"]}>
+          <ProtectedRoute allowedRoles={["bday_person", "birthday_person", "bday-person", "wisher", "org_admin", "org-admin", "super_admin", "super-admin", "admin"]}>
             <BirthdayPerson />
           </ProtectedRoute>
         } />

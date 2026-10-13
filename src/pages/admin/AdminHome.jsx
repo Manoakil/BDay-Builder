@@ -13,6 +13,7 @@ import ThemeCustomization from './ThemeCustomization';
 import OrganizationSettings from './OrganizationSettings';
 import GenerateWishBook from './GenerateWishBook';
 import OrgAnalytics from './OrgAnalytics';
+import WishersHome from '../WishersHome';
 
 export default function AdminHome() {
   return (
@@ -29,6 +30,7 @@ export default function AdminHome() {
         <Route path="/settings" element={<OrganizationSettings />} />
         <Route path="/wish-book" element={<GenerateWishBook />} />
         <Route path="/analytics" element={<OrgAnalytics />} />
+        <Route path="/wisher" element={<WishersHome />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
     </AdminLayout>
