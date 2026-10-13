@@ -127,6 +127,64 @@ export const uploadMedia = async (file, bucket = "wishes") => {
     }
   }
 
+  // 1. Try Direct Presigned Upload (bypasses Vercel 4.5 MB request body limit!)
+  try {
+    const presignRes = await fetch(`${UPLOAD_URL}/${bucket}/presign`, {
+      method: "POST",
+      headers: getAuthHeaders(true),
+      body: JSON.stringify({
+        filename: fileToUpload.name || `media-${Date.now()}`,
+        content_type: fileToUpload.type || "application/octet-stream",
+        size_bytes: fileToUpload.size,
+      }),
+    });
+
+    if (presignRes.ok) {
+      const presigned = await presignRes.json();
+      if (presigned.signed_url) {
+        // Upload directly from browser to Supabase Storage via PUT
+        const uploadDirectRes = await fetch(presigned.signed_url, {
+          method: "PUT",
+          headers: {
+            "Content-Type": fileToUpload.type || "application/octet-stream",
+          },
+          body: fileToUpload,
+        });
+
+        if (!uploadDirectRes.ok) {
+          throw new Error(`Direct storage upload failed with status ${uploadDirectRes.status}`);
+        }
+
+        // Complete upload and record file in database
+        const completeRes = await fetch(`${UPLOAD_URL}/complete`, {
+          method: "POST",
+          headers: getAuthHeaders(true),
+          body: JSON.stringify({
+            bucket: bucket,
+            path: presigned.path,
+            filename: fileToUpload.name || "file",
+            content_type: fileToUpload.type || "application/octet-stream",
+            size_bytes: fileToUpload.size,
+          }),
+        });
+
+        if (completeRes.ok) {
+          return await completeRes.json();
+        } else {
+          const compData = await completeRes.json().catch(() => ({}));
+          throw new Error(compData.detail || "Failed to finalize uploaded media");
+        }
+      }
+    }
+  } catch (directErr) {
+    console.warn("Direct presigned upload attempt:", directErr);
+    // If file is > 4 MB, standard multipart via Vercel will 413 anyway, so throw direct error
+    if (fileToUpload.size > 4 * 1024 * 1024) {
+      throw new Error(`Media upload failed: ${directErr.message || "Storage upload failed"}`);
+    }
+  }
+
+  // 2. Fallback to standard multipart upload (for small assets < 4 MB)
   const form = new FormData();
   form.append("file", fileToUpload);
   const res = await fetch(`${UPLOAD_URL}/${bucket}`, {
