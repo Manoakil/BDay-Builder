@@ -3,6 +3,7 @@
   publish = "build"
 
 [build.environment]
+  NODE_VERSION = "20"
   CI = "false"
   DISABLE_ESLINT_PLUGIN = "true"
   REACT_APP_API_URL = "https://bdaybuilder.vercel.app/api/v1"

@@ -13,7 +13,7 @@
  * - Framerate: 30 fps.
  */
 
-import fixWebmDuration from 'fix-webm-duration';
+import fixWebmDuration from './fixWebmDuration';
 
 /**
  * Patches the missing EBML duration header in WebM blobs produced by Chrome/Edge MediaRecorder.
