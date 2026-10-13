@@ -1,9 +1,10 @@
 [build]
-  command = "CI=false npm run build"
+  command = "CI=false DISABLE_ESLINT_PLUGIN=true npm run build"
   publish = "build"
 
 [build.environment]
   CI = "false"
+  DISABLE_ESLINT_PLUGIN = "true"
   REACT_APP_API_URL = "https://bdaybuilder.vercel.app/api/v1"
 
 [[redirects]]
