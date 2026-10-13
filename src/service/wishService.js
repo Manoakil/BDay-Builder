@@ -1,4 +1,5 @@
 import { API_BASE_URL, getAuthHeaders } from "./authService";
+import { compressVideo, isLargeVideo } from "../utils/videoCompressor";
 
 const WISHES_URL = `${API_BASE_URL}/wishes`;
 const TIMELINE_URL = `${API_BASE_URL}/timeline`;
@@ -117,8 +118,17 @@ export const attemptBirthdayVault = async (vaultId, attempt_answer) => {
 };
 
 export const uploadMedia = async (file, bucket = "wishes") => {
+  let fileToUpload = file;
+  if (isLargeVideo(file, 100)) {
+    try {
+      fileToUpload = await compressVideo(file);
+    } catch (err) {
+      console.warn("Auto-compression fallback in uploadMedia:", err);
+    }
+  }
+
   const form = new FormData();
-  form.append("file", file);
+  form.append("file", fileToUpload);
   const res = await fetch(`${UPLOAD_URL}/${bucket}`, {
     method: "POST",
     headers: getAuthHeaders(false),

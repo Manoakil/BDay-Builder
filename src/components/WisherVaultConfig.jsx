@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { getBirthdayVault, getWisherAccessStatus, uploadMedia, getMyWishes, getMyTimeline } from "../service/wishService";
 import { API_BASE_URL } from "../service/authService";
+import { compressVideo, isLargeVideo, formatFileSize } from "../utils/videoCompressor";
 
 const WisherVaultConfig = () => {
   const [vault, setVault] = useState(null);
@@ -46,6 +47,10 @@ const WisherVaultConfig = () => {
   const [videoTab, setVideoTab] = useState("record"); // record or upload
   const [wishUploadFile, setWishUploadFile] = useState(null);
   const [wishUploadPreview, setWishUploadPreview] = useState(null);
+  const [isCompressingVideo, setIsCompressingVideo] = useState(false);
+  const [compressProgress, setCompressProgress] = useState(0);
+  const [compressStatus, setCompressStatus] = useState("");
+  const [compressedInfo, setCompressedInfo] = useState("");
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isRecordingVideo, setIsRecordingVideo] = useState(false);
   const [wishVideoURL, setWishVideoURL] = useState(null);
@@ -420,7 +425,7 @@ const WisherVaultConfig = () => {
     }
   };
 
-  const handleWishFile = (event) => {
+  const handleWishFile = async (event) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
@@ -428,11 +433,39 @@ const WisherVaultConfig = () => {
       alert("Only video files are allowed for wishes.");
       return;
     }
-    if (file.size > 100 * 1024 * 1024) {
-      alert("Video file must be smaller than 100 MB.");
+
+    if (wishUploadPreview) URL.revokeObjectURL(wishUploadPreview);
+
+    if (isLargeVideo(file, 100)) {
+      setIsCompressingVideo(true);
+      setCompressProgress(5);
+      setCompressStatus(`Optimizing large video (${formatFileSize(file.size)}) with WhatsApp HD compression...`);
+      setCompressedInfo("");
+
+      try {
+        const compressed = await compressVideo(file, (pct, status) => {
+          setCompressProgress(pct);
+          setCompressStatus(status);
+        });
+
+        const origStr = formatFileSize(file.size);
+        const compStr = formatFileSize(compressed.size);
+        const savedPct = Math.round((1 - compressed.size / file.size) * 100);
+
+        setCompressedInfo(`✨ WhatsApp HD Optimization: Reduced from ${origStr} to ${compStr} (${savedPct}% smaller, high quality preserved)`);
+        setWishUploadFile(compressed);
+        setWishUploadPreview(URL.createObjectURL(compressed));
+      } catch (err) {
+        console.error("Video compression failed, using original file:", err);
+        setWishUploadFile(file);
+        setWishUploadPreview(URL.createObjectURL(file));
+      } finally {
+        setIsCompressingVideo(false);
+      }
       return;
     }
-    if (wishUploadPreview) URL.revokeObjectURL(wishUploadPreview);
+
+    setCompressedInfo("");
     setWishUploadFile(file);
     setWishUploadPreview(URL.createObjectURL(file));
   };
@@ -610,15 +643,67 @@ const WisherVaultConfig = () => {
 
           {videoTab === "upload" && (
             <div>
+              {isCompressingVideo && (
+                <div style={{
+                  background: "linear-gradient(135deg, rgba(37, 211, 102, 0.12) 0%, rgba(18, 140, 126, 0.2) 100%)",
+                  border: "1px solid rgba(37, 211, 102, 0.4)",
+                  borderRadius: "16px",
+                  padding: "20px",
+                  margin: "12px 0",
+                  textAlign: "center"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", marginBottom: "6px" }}>
+                    <span style={{ fontSize: "1.4rem" }}>🎬</span>
+                    <strong style={{ color: "#25D366", fontSize: "0.95rem" }}>WhatsApp HD Compression Active</strong>
+                  </div>
+                  <p style={{ margin: "4px 0 10px", fontSize: "0.85rem", color: "rgba(255,255,255,0.85)" }}>
+                    {compressStatus || "Optimizing large video for fast, smooth playback..."}
+                  </p>
+                  <div style={{
+                    width: "100%",
+                    height: "8px",
+                    background: "rgba(255,255,255,0.15)",
+                    borderRadius: "4px",
+                    overflow: "hidden"
+                  }}>
+                    <div style={{
+                      width: `${compressProgress}%`,
+                      height: "100%",
+                      background: "linear-gradient(90deg, #25D366 0%, #128C7E 100%)",
+                      transition: "width 0.3s ease"
+                    }} />
+                  </div>
+                  <span style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.6)", marginTop: "6px", display: "inline-block" }}>
+                    {compressProgress}% • Crisp 720p HD Quality Preserved
+                  </span>
+                </div>
+              )}
+
+              {compressedInfo && !isCompressingVideo && (
+                <div style={{
+                  background: "rgba(37, 211, 102, 0.12)",
+                  border: "1px solid rgba(37, 211, 102, 0.3)",
+                  color: "#25D366",
+                  borderRadius: "10px",
+                  padding: "10px 14px",
+                  fontSize: "0.84rem",
+                  margin: "10px 0",
+                  textAlign: "center",
+                  fontWeight: "500"
+                }}>
+                  {compressedInfo}
+                </div>
+              )}
+
               {wishUploadPreview ? (
                 <div style={{ textAlign: "center" }}>
                   <video src={wishUploadPreview} controls style={{ width: "100%", maxHeight: "300px", borderRadius: "12px", background: "black" }} />
                   <div style={{ display: "flex", gap: "10px", justifyContent: "center", marginTop: "16px" }}>
-                    <button onClick={() => { setWishUploadFile(null); setWishUploadPreview(null); }} style={{ ...buttonStyle, background: "#ef4444" }}>Cancel</button>
+                    <button onClick={() => { setWishUploadFile(null); setWishUploadPreview(null); setCompressedInfo(""); }} style={{ ...buttonStyle, background: "#ef4444" }}>Cancel</button>
                     <button onClick={sendUploadWish} style={{ ...buttonStyle, background: "#10b981" }}>Send Video Wish</button>
                   </div>
                 </div>
-              ) : (
+              ) : !isCompressingVideo ? (
                 <div style={{ textAlign: "center", padding: "40px", border: "1px dashed rgba(255,255,255,0.3)", borderRadius: "12px" }}>
                   <p style={{ color: "#a0a0b0", marginBottom: "16px" }}>Only video files are allowed.</p>
                   <label style={{ ...buttonStyle, background: "#3b82f6", display: "inline-block" }}>
@@ -626,7 +711,7 @@ const WisherVaultConfig = () => {
                     <input type="file" accept="video/*" style={{ display: "none" }} onChange={handleWishFile} />
                   </label>
                 </div>
-              )}
+              ) : null}
             </div>
           )}
         </div>

@@ -31,6 +31,7 @@ import {
   uploadMedia,
   getWisherAccessStatus,
 } from "../service/wishService";
+import { compressVideo, isLargeVideo, formatFileSize } from "../utils/videoCompressor";
 
 // ============================================================
 // CONSTANTS
@@ -186,6 +187,10 @@ function WishersHome() {
 
   const [wishUploadFile, setWishUploadFile] = useState(null);
   const [wishUploadPreview, setWishUploadPreview] = useState(null);
+  const [isCompressingVideo, setIsCompressingVideo] = useState(false);
+  const [compressProgress, setCompressProgress] = useState(0);
+  const [compressStatus, setCompressStatus] = useState("");
+  const [compressedInfo, setCompressedInfo] = useState("");
 
   // ============================================================
   // TIMELINE STATE
@@ -819,7 +824,7 @@ function WishersHome() {
   // ONLY VIDEO IS ALLOWED
   // ============================================================
 
-  const handleWishFile = (event) => {
+  const handleWishFile = async (event) => {
     event.stopPropagation();
 
     const file = event.target.files?.[0];
@@ -833,15 +838,6 @@ function WishersHome() {
 
     if (!file.type || !file.type.startsWith("video/")) {
       alert("Only video files are allowed for wishes.");
-
-      return;
-    }
-
-    const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
-
-    if (file.size > MAX_VIDEO_SIZE) {
-      alert("Video file must be smaller than 100 MB.");
-
       return;
     }
 
@@ -849,10 +845,40 @@ function WishersHome() {
       URL.revokeObjectURL(wishUploadPreview);
     }
 
-    const previewUrl = URL.createObjectURL(file);
+    // If video is larger than 100MB, apply WhatsApp-style HD compression
+    if (isLargeVideo(file, 100)) {
+      setIsCompressingVideo(true);
+      setCompressProgress(5);
+      setCompressStatus(`Optimizing large video (${formatFileSize(file.size)}) with WhatsApp HD compression...`);
+      setCompressedInfo("");
 
+      try {
+        const compressed = await compressVideo(file, (pct, status) => {
+          setCompressProgress(pct);
+          setCompressStatus(status);
+        });
+
+        const origStr = formatFileSize(file.size);
+        const compStr = formatFileSize(compressed.size);
+        const savedPct = Math.round((1 - compressed.size / file.size) * 100);
+
+        setCompressedInfo(`✨ WhatsApp HD Optimization: Reduced from ${origStr} to ${compStr} (${savedPct}% smaller, high quality preserved)`);
+        setWishUploadFile(compressed);
+        setWishUploadPreview(URL.createObjectURL(compressed));
+      } catch (err) {
+        console.error("Video compression failed, using original file:", err);
+        setWishUploadFile(file);
+        setWishUploadPreview(URL.createObjectURL(file));
+      } finally {
+        setIsCompressingVideo(false);
+      }
+      return;
+    }
+
+    // Video is under 100 MB: use directly
+    setCompressedInfo("");
     setWishUploadFile(file);
-    setWishUploadPreview(previewUrl);
+    setWishUploadPreview(URL.createObjectURL(file));
   };
 
   // ============================================================
@@ -1129,7 +1155,7 @@ function WishersHome() {
   // Timeline must use tlMediaRecorderRef.
   // ============================================================
 
-  const handleTLFile = (event) => {
+  const handleTLFile = async (event) => {
     const file = event.target.files?.[0];
 
     event.target.value = "";
@@ -1140,6 +1166,25 @@ function WishersHome() {
       setTlType("photo");
     } else if (file.type.startsWith("video/")) {
       setTlType("video");
+      if (isLargeVideo(file, 100)) {
+        setIsCompressingVideo(true);
+        setCompressProgress(5);
+        setCompressStatus(`Optimizing timeline video (${formatFileSize(file.size)}) with WhatsApp HD compression...`);
+        try {
+          const compressed = await compressVideo(file, (pct, status) => {
+            setCompressProgress(pct);
+            setCompressStatus(status);
+          });
+          if (tlPreview) URL.revokeObjectURL(tlPreview);
+          setTlFile(compressed);
+          setTlPreview(URL.createObjectURL(compressed));
+          return;
+        } catch (e) {
+          console.warn("Timeline video compression fallback:", e);
+        } finally {
+          setIsCompressingVideo(false);
+        }
+      }
     } else if (file.type.startsWith("audio/")) {
       setTlType("audio");
     }
@@ -1905,7 +1950,59 @@ function WishersHome() {
                 hidden
               />
 
-              {!wishUploadFile ? (
+              {isCompressingVideo && (
+                <div style={{
+                  background: "linear-gradient(135deg, rgba(37, 211, 102, 0.12) 0%, rgba(18, 140, 126, 0.2) 100%)",
+                  border: "1px solid rgba(37, 211, 102, 0.4)",
+                  borderRadius: "16px",
+                  padding: "20px",
+                  margin: "12px 0",
+                  textAlign: "center"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", marginBottom: "6px" }}>
+                    <span style={{ fontSize: "1.4rem" }}>🎬</span>
+                    <strong style={{ color: "#25D366", fontSize: "0.95rem" }}>WhatsApp HD Compression Active</strong>
+                  </div>
+                  <p style={{ margin: "4px 0 10px", fontSize: "0.85rem", color: "rgba(255,255,255,0.85)" }}>
+                    {compressStatus || "Optimizing large video for fast, smooth playback..."}
+                  </p>
+                  <div style={{
+                    width: "100%",
+                    height: "8px",
+                    background: "rgba(255,255,255,0.15)",
+                    borderRadius: "4px",
+                    overflow: "hidden"
+                  }}>
+                    <div style={{
+                      width: `${compressProgress}%`,
+                      height: "100%",
+                      background: "linear-gradient(90deg, #25D366 0%, #128C7E 100%)",
+                      transition: "width 0.3s ease"
+                    }} />
+                  </div>
+                  <span style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.6)", marginTop: "6px", display: "inline-block" }}>
+                    {compressProgress}% • Crisp 720p HD Quality Preserved
+                  </span>
+                </div>
+              )}
+
+              {compressedInfo && !isCompressingVideo && (
+                <div style={{
+                  background: "rgba(37, 211, 102, 0.12)",
+                  border: "1px solid rgba(37, 211, 102, 0.3)",
+                  color: "#25D366",
+                  borderRadius: "10px",
+                  padding: "10px 14px",
+                  fontSize: "0.84rem",
+                  margin: "10px 0",
+                  textAlign: "center",
+                  fontWeight: "500"
+                }}>
+                  {compressedInfo}
+                </div>
+              )}
+
+              {!wishUploadFile && !isCompressingVideo ? (
                 <div
                   onClick={(event) => {
                     event.stopPropagation();
