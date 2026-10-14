@@ -19,7 +19,7 @@ import WishWall from "../components/Birthday/WishWall";
 import VideoWishes from "../components/Birthday/VideoWishes";
 import MemoryTimeline from "../components/Birthday/MemoryTimeline";
 import FinalCelebration from "../components/Birthday/FinalCelebration";
-import CupidScroller from "../components/Birthday/CupidScroller";
+// import CupidScroller from "../components/Birthday/CupidScroller";
 import ScrollReveal from "../components/Birthday/ScrollReveal";
 
 // Global variable to persist intro state during a single SPA session.
@@ -203,7 +203,6 @@ const videoWishes = wishes.filter(w => w.wish_type === 'video');
         {/* Sequence 3: The Main Scroll Story */}
         {step === 'main' && (
         <>
-          <CupidScroller />
           <BirthdayNavbar birthdayName={birthdayName} hasVault={false} enableWishes={enableWishes} enableVideos={enableVideos} enableTimeline={enableTimeline} />
           
           <ScrollReveal>
