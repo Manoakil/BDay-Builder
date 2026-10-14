@@ -128,13 +128,14 @@ export const uploadMedia = async (file, bucket = "wishes") => {
   }
 
   // 1. Try Direct Presigned Upload (bypasses Vercel 4.5 MB request body limit!)
+  const cleanMime = (fileToUpload.type || "application/octet-stream").split(";")[0].trim();
   try {
     const presignRes = await fetch(`${UPLOAD_URL}/${bucket}/presign`, {
       method: "POST",
       headers: getAuthHeaders(true),
       body: JSON.stringify({
         filename: fileToUpload.name || `media-${Date.now()}`,
-        content_type: fileToUpload.type || "application/octet-stream",
+        content_type: cleanMime,
         size_bytes: fileToUpload.size,
       }),
     });
@@ -146,7 +147,7 @@ export const uploadMedia = async (file, bucket = "wishes") => {
         const uploadDirectRes = await fetch(presigned.signed_url, {
           method: "PUT",
           headers: {
-            "Content-Type": fileToUpload.type || "application/octet-stream",
+            "Content-Type": cleanMime,
           },
           body: fileToUpload,
         });
@@ -163,7 +164,7 @@ export const uploadMedia = async (file, bucket = "wishes") => {
             bucket: bucket,
             path: presigned.path,
             filename: fileToUpload.name || "file",
-            content_type: fileToUpload.type || "application/octet-stream",
+            content_type: cleanMime,
             size_bytes: fileToUpload.size,
           }),
         });

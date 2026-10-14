@@ -42,9 +42,34 @@ const formatMemoryDate = (dateStr, tags = []) => {
   return dateStr;
 };
 
-export default function MemoryTimeline({ timelineEntries = [], wisherName }) {
+export default function MemoryTimeline({ timelineEntries = [], wishes = [], wisherName }) {
   const [selectedMedia, setSelectedMedia] = useState(null);
   const carouselRef = useRef(null);
+
+  const getMemoryWisher = (entry) => {
+    if (!entry) return wisherName || "Friend";
+    if (entry.wisher_name && String(entry.wisher_name).trim()) {
+      return String(entry.wisher_name).trim();
+    }
+    if (entry.author_name && String(entry.author_name).trim()) {
+      return String(entry.author_name).trim();
+    }
+    if (entry.created_by_name && String(entry.created_by_name).trim()) {
+      return String(entry.created_by_name).trim();
+    }
+
+    if (entry.created_by && Array.isArray(wishes) && wishes.length > 0) {
+      const match = wishes.find(
+        (w) => String(w.user_id) === String(entry.created_by) || String(w.created_by) === String(entry.created_by)
+      );
+      if (match) {
+        const found = match.wisher_name || match.wisher_display_name || match.guest_name;
+        if (found && String(found).trim()) return String(found).trim();
+      }
+    }
+
+    return entry.wisher_name || entry.author_name || entry.created_by_name || "A Friend";
+  };
 
   const activeIndexRef = useRef(0);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -236,7 +261,7 @@ export default function MemoryTimeline({ timelineEntries = [], wisherName }) {
                 <h3 className="bb-editorial-text">{selectedMedia.title}</h3>
                 {selectedMedia.description && <p>{selectedMedia.description}</p>}
                 <p className="bb-editorial-text">
-                  Added by {selectedMedia.wisher_name}
+                  Added by {getMemoryWisher(selectedMedia)}
                 </p>
               </div>
             </motion.div>

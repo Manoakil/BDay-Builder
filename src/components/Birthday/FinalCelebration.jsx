@@ -65,18 +65,18 @@ export default function FinalCelebration({ eventId, birthdayName, onReplay, wish
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ delay: 4.5, duration: 1 }}
+          transition={{ duration: 0.5 }}
         >
           <button className="bb-btn-primary p-4" onClick={onReplay} style={{ background: 'transparent', border: '1px solid var(--bb-primary)', color: 'var(--bb-primary)', paddingLeft: '20px', paddingRight: '20px' }}>
             Replay Your Birthday
           </button>
-          {(!isOffline && orgSettings?.download_enabled && (localStorage.getItem('role') === 'org_admin' || localStorage.getItem('role') === 'bday_person' || localStorage.getItem('role') === 'birthday_person' || localStorage.getItem('role')?.includes('admin'))) && (
+          {!isOffline && (
             <button
               className="bb-btn-primary"
               onClick={handleDownload}
-              style={{ background: 'transparent', border: '1px solid var(--bb-primary)', color: 'var(--bb-primary)', paddingLeft: '20px', paddingRight: '20px' }}
+              style={{ background: 'var(--bb-primary)', border: '1px solid var(--bb-primary)', color: '#fff', paddingLeft: '20px', paddingRight: '20px', fontWeight: '600' }}
             >
-              Save My Celebration
+              📥 Download Celebration
             </button>
           )}
           <button className="bb-btn-primary" onClick={scrollToTop} style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--bb-text-deep)', boxShadow: 'none', border: '1px solid var(--bb-primary)', padding: "5px", paddingLeft: "10px", paddingRight: "10px" }}>

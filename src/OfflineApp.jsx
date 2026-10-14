@@ -91,7 +91,7 @@ const videoWishes = data.wishes.filter(w => w.wish_type === 'video');
           
           {enableTimeline && (
             timeline.length > 0 ? (
-              <MemoryTimeline timelineEntries={timeline} />
+              <MemoryTimeline timelineEntries={timeline} wishes={data.wishes} />
             ) : (
               <section style={{ padding: '100px 20px', textAlign: 'center', color: 'var(--bb-text-muted)' }}>
                 <p>Your Memory Line is waiting for its first chapter.</p>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, useScroll, useMotionValueEvent } from 'framer-motion';
 import './BirthdayNavbar.css';
 
-export default function BirthdayNavbar({ birthdayName, hasVault, enableWishes=true, enableVideos=true, enableTimeline=true }) {
+export default function BirthdayNavbar({ birthdayName, hasVault, enableWishes=true, enableVideos=true, enableTimeline=true, onDownload }) {
   const { scrollY } = useScroll();
   const [hidden, setHidden] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -53,6 +53,25 @@ export default function BirthdayNavbar({ birthdayName, hasVault, enableWishes=tr
           {hasVault && (
             <button onClick={() => scrollTo('vault')} className="bb-navbar-link bb-vault-link">
               <span className="bb-navbar-icon-small">♡</span> Vault
+            </button>
+          )}
+          {onDownload && (
+            <button
+              onClick={onDownload}
+              className="bb-navbar-link"
+              style={{
+                background: "rgba(255, 77, 141, 0.12)",
+                border: "1px solid rgba(255, 77, 141, 0.4)",
+                borderRadius: "20px",
+                padding: "4px 12px",
+                color: "var(--bb-primary)",
+                fontWeight: "600",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px"
+              }}
+            >
+              📥 Download
             </button>
           )}
         </div>

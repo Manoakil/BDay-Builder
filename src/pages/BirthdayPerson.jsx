@@ -21,6 +21,7 @@ import MemoryTimeline from "../components/Birthday/MemoryTimeline";
 import FinalCelebration from "../components/Birthday/FinalCelebration";
 // import CupidScroller from "../components/Birthday/CupidScroller";
 import ScrollReveal from "../components/Birthday/ScrollReveal";
+import DownloadModal from "../components/download/DownloadModal";
 
 // Global variable to persist intro state during a single SPA session.
 // This survives React Router navigation (e.g., to the Vault and back) 
@@ -57,6 +58,7 @@ export default function BirthdayPerson() {
   const [revealAt, setRevealAt] = useState(null);
   const [now, setNow] = useState(Date.now());
   const [birthdayName, setBirthdayName] = useState("Birthday Star");
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
 
   const [orgSettings, setOrgSettings] = useState({});
@@ -117,7 +119,22 @@ export default function BirthdayPerson() {
         if (vaultData && Object.keys(vaultData).length > 0) {
           setVault({...vaultData, is_locked: !vaultData.unlock_time}); 
         }
-        setTimeline(timelineData || []);
+
+        const wisherMap = {};
+        (wishList || []).forEach((w) => {
+          const uid = w.user_id || w.created_by;
+          const name = w.wisher_name || w.wisher_display_name || w.guest_name;
+          if (uid && name && !wisherMap[String(uid)]) {
+            wisherMap[String(uid)] = String(name).trim();
+          }
+        });
+
+        const enrichedTimeline = (timelineData || []).map((entry) => ({
+          ...entry,
+          wisher_name: entry.wisher_name || (entry.created_by ? wisherMap[String(entry.created_by)] : null) || entry.author_name || entry.created_by_name || null,
+        }));
+
+        setTimeline(enrichedTimeline);
       })
       .catch((err) => console.error("Error loading data:", err))
       .finally(() => setLoading(false));
@@ -203,7 +220,7 @@ const videoWishes = wishes.filter(w => w.wish_type === 'video');
         {/* Sequence 3: The Main Scroll Story */}
         {step === 'main' && (
         <>
-          <BirthdayNavbar birthdayName={birthdayName} hasVault={false} enableWishes={enableWishes} enableVideos={enableVideos} enableTimeline={enableTimeline} />
+          <BirthdayNavbar birthdayName={birthdayName} hasVault={false} enableWishes={enableWishes} enableVideos={enableVideos} enableTimeline={enableTimeline} onDownload={() => setIsDownloadModalOpen(true)} />
           
           <ScrollReveal>
             <PersonalMessage />
@@ -230,7 +247,7 @@ const videoWishes = wishes.filter(w => w.wish_type === 'video');
           {enableTimeline && (
             timeline.length > 0 ? (
               <ScrollReveal>
-                <MemoryTimeline timelineEntries={timeline} wisherName={vault?.dynamic_data?.wisher_name || "Your Name"} />
+                <MemoryTimeline timelineEntries={timeline} wishes={wishes} />
               </ScrollReveal>
             ) : (
               <ScrollReveal>
@@ -254,6 +271,16 @@ const videoWishes = wishes.filter(w => w.wish_type === 'video');
               orgSettings={orgSettings}
             />
           </ScrollReveal>
+
+          <DownloadModal
+            isOpen={isDownloadModalOpen}
+            onClose={() => setIsDownloadModalOpen(false)}
+            eventId={event?.id}
+            birthdayName={birthdayName}
+            wishes={textWishes}
+            videoWishes={videoWishes}
+            timeline={timeline}
+          />
         </>
       )}
       </AnimatePresence>
