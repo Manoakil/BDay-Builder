@@ -660,7 +660,7 @@ const WisherVaultConfig = () => {
                 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", marginBottom: "6px" }}>
                     <span style={{ fontSize: "1.4rem" }}>🎬</span>
-                    <strong style={{ color: "#25D366", fontSize: "0.95rem" }}>WhatsApp HD Compression Active</strong>
+                    <strong style={{ color: "#25D366", fontSize: "0.95rem" }}>HD Compression Active</strong>
                   </div>
                   <p style={{ margin: "4px 0 10px", fontSize: "0.85rem", color: "rgba(255,255,255,0.85)" }}>
                     {compressStatus || "Optimizing large video for fast, smooth playback..."}
