@@ -99,6 +99,10 @@ export const getWisherAccessStatus = async () => {
 };
 
 export const getBirthdayVault = async (eventId) => {
+  try {
+    const manageRes = await fetch(`${API_BASE_URL}/vault/${eventId}/manage`, { headers: getAuthHeaders() });
+    if (manageRes.ok) return await manageRes.json();
+  } catch {}
   const res = await fetch(`${API_BASE_URL}/vault/${eventId}`, { headers: getAuthHeaders() });
   if (res.status === 404) return null;
   if (!res.ok) {

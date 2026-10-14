@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { getBirthdayVault, getWisherAccessStatus, uploadMedia, getMyWishes, getMyTimeline } from "../service/wishService";
-import { API_BASE_URL } from "../service/authService";
+import { getBirthdayVault, getWisherAccessStatus, uploadMedia, getMyWishes, getMyTimeline, deleteTimelineEntry } from "../service/wishService";
+import { API_BASE_URL, getAuthHeaders } from "../service/authService";
 import { compressVideo, isLargeVideo, formatFileSize, fixWebmBlobDuration } from "../utils/videoCompressor";
 
 const WisherVaultConfig = () => {
@@ -22,6 +22,7 @@ const WisherVaultConfig = () => {
 
   const [letterParagraphs, setLetterParagraphs] = useState([]);
   const [newParagraph, setNewParagraph] = useState("");
+  const [editingLetterIdx, setEditingLetterIdx] = useState(null);
 
   const [confessionText, setConfessionText] = useState("I've been wanting to tell you something for a while.");
   const [proposalQuestion, setProposalQuestion] = useState("Would you let me love you a little more than just a best friend?");
@@ -32,6 +33,11 @@ const WisherVaultConfig = () => {
   const [tlTitle, setTlTitle] = useState("");
   const [tlDesc, setTlDesc] = useState("");
   const tlFileInput = useRef(null);
+
+  // Timeline photo preview & upload state
+  const [tlSelectedFile, setTlSelectedFile] = useState(null);
+  const [tlFilePreview, setTlFilePreview] = useState(null);
+  const [isUploadingMoment, setIsUploadingMoment] = useState(false);
 
   const [photos, setPhotos] = useState([]);
   const photoFileInput = useRef(null);
@@ -132,6 +138,7 @@ const WisherVaultConfig = () => {
               }
             }
             return {
+              id: t.id,
               date: dString,
               year: yString,
               title: t.title || "Memory",
@@ -197,7 +204,7 @@ const WisherVaultConfig = () => {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${localStorage.getItem("access_token")}`
+            ...getAuthHeaders()
           },
           body: JSON.stringify({ dynamic_data: currentFullData })
         });
@@ -224,7 +231,7 @@ const WisherVaultConfig = () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${localStorage.getItem("access_token")}`
+            ...getAuthHeaders()
           },
           body: JSON.stringify({
             event_id: currentEventId,
@@ -251,16 +258,73 @@ const WisherVaultConfig = () => {
 
   const handleAddLittleThing = () => {
     if (newLittleThing.trim()) {
-      setLittleThings(prev => [...prev, newLittleThing]);
+      const updated = [...littleThings, newLittleThing.trim()];
+      setLittleThings(updated);
       setNewLittleThing("");
+      saveSection('littleThings', { littleThings: updated });
     }
   };
 
-  const handleAddParagraph = () => {
-    if (newParagraph.trim()) {
-      setLetterParagraphs(prev => [...prev, newParagraph]);
+  const handleDeleteLittleThing = (idx) => {
+    const updated = littleThings.filter((_, i) => i !== idx);
+    setLittleThings(updated);
+    saveSection('littleThings', { littleThings: updated });
+  };
+
+  const handleAddOrUpdateParagraph = () => {
+    if (!newParagraph.trim()) {
+      alert("Please write something in the paragraph.");
+      return;
+    }
+    const text = newParagraph.trim();
+    const parts = text.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+    let updated;
+    if (editingLetterIdx !== null) {
+      updated = letterParagraphs.map((p, i) => i === editingLetterIdx ? text : p);
+    } else {
+      updated = [...letterParagraphs, ...(parts.length > 1 ? parts : [text])];
+    }
+    setLetterParagraphs(updated);
+    setNewParagraph("");
+    setEditingLetterIdx(null);
+    saveSection('letter', { letterParagraphs: updated });
+  };
+
+  const handleDeleteParagraph = (idx) => {
+    const updated = letterParagraphs.filter((_, i) => i !== idx);
+    setLetterParagraphs(updated);
+    if (editingLetterIdx === idx) {
+      setEditingLetterIdx(null);
       setNewParagraph("");
     }
+    saveSection('letter', { letterParagraphs: updated });
+  };
+
+  const handleEditParagraph = (idx) => {
+    setEditingLetterIdx(idx);
+    setNewParagraph(letterParagraphs[idx]);
+  };
+
+  const handleCancelLetterEdit = () => {
+    setEditingLetterIdx(null);
+    setNewParagraph("");
+  };
+
+  const handleSaveFullLetter = () => {
+    let updated = [...letterParagraphs];
+    if (newParagraph.trim()) {
+      const text = newParagraph.trim();
+      const parts = text.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+      if (editingLetterIdx !== null) {
+        updated = updated.map((p, i) => i === editingLetterIdx ? text : p);
+      } else {
+        updated = [...updated, ...(parts.length > 1 ? parts : [text])];
+      }
+      setLetterParagraphs(updated);
+      setNewParagraph("");
+      setEditingLetterIdx(null);
+    }
+    saveSection('letter', { letterParagraphs: updated });
   };
 
   const getPublicUrl = (data) => {
@@ -284,27 +348,89 @@ const WisherVaultConfig = () => {
     }
   };
 
-  const handleTimelinePhoto = async (e) => {
+  const handleSelectTimelinePhoto = (e) => {
     if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (tlFilePreview && tlFilePreview.startsWith("blob:")) {
+        URL.revokeObjectURL(tlFilePreview);
+      }
+      setTlSelectedFile(file);
+      setTlFilePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleRemoveTimelinePhoto = () => {
+    if (tlFilePreview && tlFilePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(tlFilePreview);
+    }
+    setTlSelectedFile(null);
+    setTlFilePreview(null);
+    if (tlFileInput.current) {
+      tlFileInput.current.value = "";
+    }
+  };
+
+  const handleAddMoment = async () => {
+    if (!tlYear.trim()) {
+      alert("Please enter the year (e.g. 2024)");
+      return;
+    }
+    if (!tlTitle.trim()) {
+      alert("Please enter a title for this moment");
+      return;
+    }
+    if (!tlSelectedFile) {
+      alert("Please choose a photo for this moment");
+      return;
+    }
+
+    setIsUploadingMoment(true);
+    setSavingStatus(prev => ({ ...prev, 'timeline': "Uploading moment..." }));
+    try {
+      const data = await uploadMedia(tlSelectedFile, "wishes");
+      const url = getPublicUrl(data);
+      if (url) {
+        const newMoment = {
+          date: tlDate.trim(),
+          year: tlYear.trim(),
+          title: tlTitle.trim(),
+          description: tlDesc.trim(),
+          image: url
+        };
+        const newTimeline = [...timeline, newMoment];
+        setTimeline(newTimeline);
+        setTlDate("");
+        setTlYear("");
+        setTlTitle("");
+        setTlDesc("");
+        handleRemoveTimelinePhoto();
+        await saveSection('timeline', { timeline: newTimeline });
+      } else {
+        alert("Could not get image URL from upload");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Upload failed: " + (err.message || "Unknown error"));
+    } finally {
+      setIsUploadingMoment(false);
+    }
+  };
+
+  const handleDeleteTimelineItem = async (idx) => {
+    const itemToDelete = timeline[idx];
+    const newTimeline = timeline.filter((_, i) => i !== idx);
+    setTimeline(newTimeline);
+    setSavingStatus(prev => ({ ...prev, 'timeline': "Deleting..." }));
+
+    if (itemToDelete?.id) {
       try {
-        const data = await uploadMedia(e.target.files[0], "wishes");
-        const url = getPublicUrl(data);
-        if (url) {
-          const newTimeline = [...timeline, {
-            date: tlDate,
-            year: tlYear,
-            title: tlTitle,
-            description: tlDesc,
-            image: url
-          }];
-          setTimeline(newTimeline);
-          setTlDate(""); setTlYear(""); setTlTitle(""); setTlDesc("");
-          saveSection('timeline', { timeline: newTimeline });
-        }
+        await deleteTimelineEntry(itemToDelete.id);
       } catch (err) {
-        alert("Upload failed");
+        console.warn("Could not delete from backend timeline table:", err);
       }
     }
+
+    await saveSection('timeline', { timeline: newTimeline });
   };
 
   // VIDEO RECORDING LOGIC
@@ -746,24 +872,30 @@ const WisherVaultConfig = () => {
       {activeTab === "photos" && (
         <>
           <div style={cardStyle}>
-            <h3 style={{ margin: 0, fontSize: "1.3rem", color: "#e2e8f0" }}>Little Things About You</h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ margin: 0, fontSize: "1.3rem", color: "#e2e8f0" }}>Little Things About You</h3>
+              <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>{littleThings.length} items</span>
+            </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {littleThings.map((thing, idx) => (
                 <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.05)", padding: "12px 16px", borderRadius: "8px" }}>
                   <span>{thing}</span>
-                  <button type="button" onClick={() => setLittleThings(littleThings.filter((_, i) => i !== idx))} style={{ color: "#ef4444", background: "none", border: "none", cursor: "pointer", fontSize: "1.2rem" }}>×</button>
+                  <button type="button" onClick={() => handleDeleteLittleThing(idx)} title="Delete item" style={{ color: "#ef4444", background: "none", border: "none", cursor: "pointer", fontSize: "1.2rem", fontWeight: "bold" }}>×</button>
                 </div>
               ))}
             </div>
             <div style={{ display: "flex", gap: "10px" }}>
-              <input type="text" value={newLittleThing} onChange={e => setNewLittleThing(e.target.value)} style={inputStyle} placeholder="E.g., The way you laugh at bad jokes..." />
+              <input type="text" value={newLittleThing} onChange={e => setNewLittleThing(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleAddLittleThing(); } }} style={inputStyle} placeholder="E.g., The way you laugh at bad jokes..." />
               <button type="button" onClick={handleAddLittleThing} style={{ ...buttonStyle, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", boxShadow: "none" }}>Add</button>
             </div>
             <SaveButton sectionName="littleThings" onClick={() => saveSection('littleThings', { littleThings })} />
           </div>
 
           <div style={cardStyle}>
-            <h3 style={{ margin: 0, fontSize: "1.3rem", color: "#e2e8f0" }}>Proof That We Were Here (Special Photos)</h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ margin: 0, fontSize: "1.3rem", color: "#e2e8f0" }}>Proof That We Were Here (Special Photos)</h3>
+              <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>{photos.length} photos</span>
+            </div>
             <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
               {photos.map((url, idx) => (
                 <div key={idx} style={{ position: "relative", width: "120px", height: "120px" }}>
@@ -772,7 +904,7 @@ const WisherVaultConfig = () => {
                     const newP = photos.filter((_, i) => i !== idx);
                     setPhotos(newP);
                     saveSection('photos', { photos: newP });
-                  }} style={{ position: "absolute", top: "-8px", right: "-8px", background: "#ef4444", color: "white", border: "none", borderRadius: "50%", width: "26px", height: "26px", cursor: "pointer", fontWeight: "bold" }}>×</button>
+                  }} title="Delete photo" style={{ position: "absolute", top: "-8px", right: "-8px", background: "#ef4444", color: "white", border: "none", borderRadius: "50%", width: "26px", height: "26px", cursor: "pointer", fontWeight: "bold" }}>×</button>
                 </div>
               ))}
             </div>
@@ -783,18 +915,84 @@ const WisherVaultConfig = () => {
           </div>
 
           <div style={cardStyle}>
-            <h3 style={{ margin: 0, fontSize: "1.3rem", color: "#e2e8f0" }}>A Letter For You</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {letterParagraphs.map((para, idx) => (
-                <div key={idx} style={{ position: "relative", background: "rgba(255,255,255,0.05)", padding: "16px", borderRadius: "8px" }}>
-                  <p style={{ margin: 0, paddingRight: "20px", lineHeight: "1.5" }}>{para}</p>
-                  <button type="button" onClick={() => setLetterParagraphs(letterParagraphs.filter((_, i) => i !== idx))} style={{ position: "absolute", top: "12px", right: "12px", color: "#ef4444", background: "none", border: "none", cursor: "pointer", fontSize: "1.2rem" }}>×</button>
-                </div>
-              ))}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ margin: 0, fontSize: "1.3rem", color: "#e2e8f0" }}>💌 A Letter For You</h3>
+              <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
+                {letterParagraphs.length} {letterParagraphs.length === 1 ? "paragraph" : "paragraphs"}
+              </span>
             </div>
-            <textarea value={newParagraph} onChange={e => setNewParagraph(e.target.value)} style={{ ...inputStyle, minHeight: "100px" }} placeholder="Write a paragraph..."></textarea>
-            <button type="button" onClick={handleAddParagraph} style={{ ...buttonStyle, alignSelf: "flex-start", background: "rgba(255,255,255,0.1)", boxShadow: "none", border: "1px solid rgba(255,255,255,0.2)" }}>+ Add Paragraph</button>
-            <SaveButton sectionName="letter" onClick={() => saveSection('letter', { letterParagraphs })} />
+            <p style={{ color: "#a0a0b0", fontSize: "0.9rem", margin: 0 }}>
+              Write your heartfelt letter for the birthday star. You can add multiple paragraphs, edit them, or delete them anytime.
+            </p>
+
+            {/* List of saved paragraphs */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              {letterParagraphs.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "18px", color: "#64748b", background: "rgba(255,255,255,0.02)", borderRadius: "8px", border: "1px dashed rgba(255,255,255,0.1)" }}>
+                  No paragraphs written yet. Write your message below!
+                </div>
+              ) : (
+                letterParagraphs.map((para, idx) => (
+                  <div key={idx} style={{ position: "relative", background: "rgba(255,255,255,0.05)", padding: "16px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                      <span style={{ fontSize: "0.75rem", fontWeight: "700", textTransform: "uppercase", letterSpacing: "1px", color: "#818cf8" }}>
+                        Paragraph {idx + 1}
+                      </span>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button
+                          type="button"
+                          onClick={() => handleEditParagraph(idx)}
+                          style={{ background: "rgba(255,255,255,0.1)", color: "#cbd5e1", border: "none", borderRadius: "6px", padding: "4px 10px", cursor: "pointer", fontSize: "0.8rem", fontWeight: "500" }}
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteParagraph(idx)}
+                          title="Delete paragraph"
+                          style={{ background: "rgba(239, 68, 68, 0.2)", color: "#f87171", border: "none", borderRadius: "6px", padding: "4px 10px", cursor: "pointer", fontSize: "0.8rem", fontWeight: "600" }}
+                        >
+                          🗑 Delete
+                        </button>
+                      </div>
+                    </div>
+                    <p style={{ margin: 0, lineHeight: "1.6", color: "#f1f5f9", whiteSpace: "pre-wrap" }}>{para}</p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Paragraph Editor */}
+            <div style={{ background: "rgba(0,0,0,0.2)", padding: "16px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column", gap: "10px" }}>
+              {editingLetterIdx !== null && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(129, 140, 248, 0.15)", padding: "8px 12px", borderRadius: "6px", border: "1px solid rgba(129, 140, 248, 0.3)" }}>
+                  <span style={{ color: "#a5b4fc", fontSize: "0.85rem", fontWeight: "600" }}>Editing Paragraph {editingLetterIdx + 1}</span>
+                  <button type="button" onClick={handleCancelLetterEdit} style={{ background: "none", border: "none", color: "#cbd5e1", cursor: "pointer", fontSize: "0.8rem" }}>✕ Cancel</button>
+                </div>
+              )}
+              <textarea
+                value={newParagraph}
+                onChange={e => setNewParagraph(e.target.value)}
+                style={{ ...inputStyle, minHeight: "110px", resize: "vertical" }}
+                placeholder={editingLetterIdx !== null ? "Edit your paragraph here..." : "Write a paragraph or full letter here... (Pasting text with line breaks works too)"}
+              />
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={handleAddOrUpdateParagraph}
+                  style={{ ...buttonStyle, background: editingLetterIdx !== null ? "#3b82f6" : "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.2)", boxShadow: "none" }}
+                >
+                  {editingLetterIdx !== null ? "✓ Update Paragraph & Save to DB" : "+ Add Paragraph & Save to DB"}
+                </button>
+                {editingLetterIdx !== null && (
+                  <button type="button" onClick={handleCancelLetterEdit} style={{ ...buttonStyle, background: "rgba(255,255,255,0.08)", boxShadow: "none" }}>
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <SaveButton sectionName="letter" onClick={handleSaveFullLetter} />
           </div>
 
           <div style={cardStyle}>
@@ -814,34 +1012,131 @@ const WisherVaultConfig = () => {
 
       {activeTab === "timeline" && (
         <div style={cardStyle}>
-          <h3 style={{ margin: 0, fontSize: "1.3rem", color: "#e2e8f0" }}>Moments I Keep (Vault Timeline)</h3>
-          <p style={{ color: "#a0a0b0", fontSize: "0.9rem" }}>Year and Title are mandatory. Date and Description are optional.</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            {timeline.map((item, idx) => (
-              <div key={idx} style={{ display: "flex", gap: "16px", alignItems: "center", background: "rgba(255,255,255,0.05)", padding: "16px", borderRadius: "12px" }}>
-                <img src={item.image} alt="timeline" style={{ width: "80px", height: "80px", objectFit: "cover", borderRadius: "8px" }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: "bold", fontSize: "1.1rem", color: "#fff", marginBottom: "4px" }}>
-                    {item.date && item.date !== "Unknown" ? `${item.date} ` : ""}{item.year} - {item.title}
-                  </div>
-                  <div style={{ color: "#94a3b8", lineHeight: "1.4" }}>{item.description}</div>
-                </div>
-                <button type="button" onClick={() => setTimeline(timeline.filter((_, i) => i !== idx))} style={{ color: "#ef4444", background: "none", border: "none", cursor: "pointer", fontSize: "1.5rem" }}>×</button>
-              </div>
-            ))}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h3 style={{ margin: 0, fontSize: "1.3rem", color: "#e2e8f0" }}>Moments I Keep (Vault Timeline)</h3>
+            <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
+              {timeline.length} {timeline.length === 1 ? "moment" : "moments"}
+            </span>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px", background: "rgba(0,0,0,0.2)", padding: "16px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.05)", marginTop: "8px" }}>
+          <p style={{ color: "#a0a0b0", fontSize: "0.9rem", margin: 0 }}>
+            Year and Title are mandatory. Add memorable photos with dates and descriptions.
+          </p>
+
+          {/* List of existing timeline uploads */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {timeline.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "24px", color: "#64748b", background: "rgba(255,255,255,0.02)", borderRadius: "10px", border: "1px dashed rgba(255,255,255,0.1)" }}>
+                No timeline moments uploaded yet. Add your first memory below!
+              </div>
+            ) : (
+              timeline.map((item, idx) => (
+                <div key={idx} style={{ display: "flex", gap: "16px", alignItems: "center", background: "rgba(255,255,255,0.05)", padding: "14px 16px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <img src={item.image} alt={item.title || "timeline"} style={{ width: "80px", height: "80px", objectFit: "cover", borderRadius: "10px", flexShrink: 0, border: "1px solid rgba(255,255,255,0.15)" }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: "bold", fontSize: "1.05rem", color: "#fff", marginBottom: "4px" }}>
+                      {item.date && item.date !== "Unknown" ? `${item.date} ` : ""}{item.year} - {item.title}
+                    </div>
+                    {item.description && (
+                      <div style={{ color: "#94a3b8", fontSize: "0.9rem", lineHeight: "1.4", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {item.description}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteTimelineItem(idx)}
+                    title="Delete timeline moment"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      background: "rgba(239, 68, 68, 0.15)",
+                      color: "#f87171",
+                      border: "1px solid rgba(239, 68, 68, 0.4)",
+                      borderRadius: "8px",
+                      padding: "8px 14px",
+                      cursor: "pointer",
+                      fontWeight: "600",
+                      fontSize: "0.85rem",
+                      flexShrink: 0,
+                      transition: "all 0.2s"
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(239, 68, 68, 0.3)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "rgba(239, 68, 68, 0.15)"}
+                  >
+                    🗑 Delete
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Add Moment Form */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px", background: "rgba(0,0,0,0.25)", padding: "18px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.1)", marginTop: "8px" }}>
+            <h4 style={{ margin: 0, color: "#cbd5e1", fontSize: "1rem" }}>+ Add New Moment to Timeline</h4>
             <div style={{ display: "flex", gap: "12px" }}>
               <input type="text" placeholder="Date (Optional, e.g. 15 Oct)" value={tlDate} onChange={e => setTlDate(e.target.value)} style={inputStyle} />
-              <input type="text" placeholder="Year (Mandatory, e.g. 2023)" value={tlYear} onChange={e => setTlYear(e.target.value)} style={inputStyle} />
+              <input type="text" placeholder="Year * (Mandatory, e.g. 2023)" value={tlYear} onChange={e => setTlYear(e.target.value)} style={inputStyle} />
             </div>
-            <input type="text" placeholder="Title (Mandatory)" value={tlTitle} onChange={e => setTlTitle(e.target.value)} style={inputStyle} />
-            <textarea placeholder="Description (Optional)" value={tlDesc} onChange={e => setTlDesc(e.target.value)} style={{ ...inputStyle, minHeight: "80px" }}></textarea>
-            <input type="file" ref={tlFileInput} style={{ display: "none" }} accept="image/*" onChange={handleTimelinePhoto} />
-            <button type="button" onClick={() => { if (tlYear && tlTitle) tlFileInput.current.click(); else alert("Fill Year & Title first!"); }} style={{ ...buttonStyle, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", boxShadow: "none", alignSelf: "flex-start" }}>
-              + Choose Image & Add Moment
+            <input type="text" placeholder="Title * (Mandatory, e.g. That rainy evening)" value={tlTitle} onChange={e => setTlTitle(e.target.value)} style={inputStyle} />
+            <textarea placeholder="Description (Optional, e.g. The first time we hung out...)" value={tlDesc} onChange={e => setTlDesc(e.target.value)} style={{ ...inputStyle, minHeight: "75px" }}></textarea>
+            
+            {/* Photo Selection & Preview with Remove */}
+            <input type="file" ref={tlFileInput} style={{ display: "none" }} accept="image/*" onChange={handleSelectTimelinePhoto} />
+            
+            {tlFilePreview ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "16px", background: "rgba(255,255,255,0.05)", padding: "12px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.1)" }}>
+                <img src={tlFilePreview} alt="Selected preview" style={{ width: "70px", height: "70px", objectFit: "cover", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.2)" }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: "#e2e8f0", fontSize: "0.9rem", fontWeight: "500" }}>{tlSelectedFile?.name || "Selected Photo"}</div>
+                  <div style={{ color: "#10b981", fontSize: "0.8rem", marginTop: "2px" }}>Ready to upload</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRemoveTimelinePhoto}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    background: "rgba(239, 68, 68, 0.2)",
+                    color: "#f87171",
+                    border: "1px solid rgba(239, 68, 68, 0.4)",
+                    borderRadius: "6px",
+                    padding: "6px 12px",
+                    cursor: "pointer",
+                    fontSize: "0.82rem",
+                    fontWeight: "600"
+                  }}
+                >
+                  ✕ Remove Photo
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => tlFileInput.current?.click()}
+                style={{ ...buttonStyle, background: "rgba(255,255,255,0.1)", border: "1px dashed rgba(255,255,255,0.3)", boxShadow: "none", alignSelf: "flex-start" }}
+              >
+                📷 Choose Timeline Photo
+              </button>
+            )}
+
+            <button
+              type="button"
+              disabled={isUploadingMoment}
+              onClick={handleAddMoment}
+              style={{
+                ...buttonStyle,
+                background: isUploadingMoment ? "#94a3b8" : "linear-gradient(135deg, #10b981, #059669)",
+                boxShadow: "0 4px 15px rgba(16, 185, 129, 0.3)",
+                alignSelf: "flex-start",
+                marginTop: "4px"
+              }}
+            >
+              {isUploadingMoment ? "Uploading & Saving..." : "✓ Add Moment & Save to DB"}
             </button>
           </div>
+
           <SaveButton sectionName="timeline" onClick={() => saveSection('timeline', { timeline })} />
         </div>
       )}

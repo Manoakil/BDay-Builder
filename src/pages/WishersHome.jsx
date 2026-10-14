@@ -213,6 +213,7 @@ function WishersHome() {
   const [tlType, setTlType] = useState("photo");
   const [tlFile, setTlFile] = useState(null);
   const [tlPreview, setTlPreview] = useState(null);
+  const [tlFileRemoved, setTlFileRemoved] = useState(false);
 
   // ============================================================
   // REFS
@@ -1151,6 +1152,8 @@ function WishersHome() {
 
     if (!file) return;
 
+    setTlFileRemoved(false);
+
     if (file.type.startsWith("image/")) {
       setTlType("photo");
     } else if (file.type.startsWith("video/")) {
@@ -1164,7 +1167,7 @@ function WishersHome() {
             setCompressProgress(pct);
             setCompressStatus(status);
           });
-          if (tlPreview) URL.revokeObjectURL(tlPreview);
+          if (tlPreview && tlPreview.startsWith("blob:")) URL.revokeObjectURL(tlPreview);
           setTlFile(compressed);
           setTlPreview(URL.createObjectURL(compressed));
           return;
@@ -1178,7 +1181,7 @@ function WishersHome() {
       setTlType("audio");
     }
 
-    if (tlPreview) {
+    if (tlPreview && tlPreview.startsWith("blob:")) {
       URL.revokeObjectURL(tlPreview);
     }
 
@@ -1196,12 +1199,16 @@ function WishersHome() {
     setTlDesc("");
     setTlType("photo");
 
-    if (tlPreview) {
+    if (tlPreview && tlPreview.startsWith("blob:")) {
       URL.revokeObjectURL(tlPreview);
     }
 
     setTlFile(null);
     setTlPreview(null);
+    setTlFileRemoved(false);
+    if (tlFileInputRef.current) {
+      tlFileInputRef.current.value = "";
+    }
 
     setEditTimelineId(null);
   };
@@ -1222,6 +1229,7 @@ function WishersHome() {
 
     setTlFile(null);
     setTlPreview(entry.preview || null);
+    setTlFileRemoved(false);
   };
 
   const saveTimeline = async (event) => {
@@ -1250,12 +1258,13 @@ function WishersHome() {
         "0",
       )}-${String(tlDay || "1").padStart(2, "0")}`;
 
-      let fileId = null;
+      let fileId = undefined;
 
       if (tlFile) {
         const uploaded = await uploadMedia(tlFile, "timeline");
-
         fileId = uploaded?.id || null;
+      } else if (tlFileRemoved) {
+        fileId = null;
       }
 
       let precision = 'day';
@@ -1268,7 +1277,7 @@ function WishersHome() {
         location: tlLocation || null,
         description: tlDesc || null,
         category: tlType,
-        file_id: fileId,
+        ...(fileId !== undefined ? { file_id: fileId } : {}),
         tags: [`precision:${precision}`]
       };
 
@@ -1555,12 +1564,16 @@ function WishersHome() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (tlPreview) {
+                      if (tlPreview && tlPreview.startsWith("blob:")) {
                         URL.revokeObjectURL(tlPreview);
                       }
 
                       setTlFile(null);
                       setTlPreview(null);
+                      setTlFileRemoved(true);
+                      if (tlFileInputRef.current) {
+                        tlFileInputRef.current.value = "";
+                      }
                     }}
                     className="wh-btn-t"
                   >
