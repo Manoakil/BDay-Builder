@@ -236,7 +236,7 @@ export default function MemoryTimeline({ timelineEntries = [], wisherName }) {
                 <h3 className="bb-editorial-text">{selectedMedia.title}</h3>
                 {selectedMedia.description && <p>{selectedMedia.description}</p>}
                 <p className="bb-editorial-text">
-                  Added by {wisherName}
+                  Added by {selectedMedia.wisher_name}
                 </p>
               </div>
             </motion.div>
